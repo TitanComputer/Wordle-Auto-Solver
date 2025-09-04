@@ -73,6 +73,16 @@ class WordleApp(tk.Tk):
         )
         self.donate_button.pack(fill=tk.X, padx=10)
 
+    def check_driver(self):
+        if self.driver:
+            try:
+                self.driver.title
+            except Exception:
+                self.add_log("Chrome window was closed unexpectedly.")
+                self.running = False
+                self.start_button.config(text="Start")
+                self.driver = None
+
     def resource_path(self, relative_path):
         temp_dir = os.path.dirname(__file__)
         return os.path.join(temp_dir, relative_path)
@@ -168,6 +178,9 @@ class WordleApp(tk.Tk):
             solved = False
 
             for attempt in range(6):
+                self.check_driver()
+                if not self.running:
+                    break
                 if not self.running:
                     self.add_log("Stopped by user.")
                     break
