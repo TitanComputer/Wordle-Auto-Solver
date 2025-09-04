@@ -183,7 +183,6 @@ class WordleApp(tk.Tk):
                 self.add_log("Clicked 'Accept all' button.")
             except Exception as ex:
                 self.add_log(f"'Accept all' button not found or not clickable: {ex}")
-                return
 
             # 2) Click "Play" button (start the game) if present
             play_xpath = "//button[contains(text(),'Play')]"
@@ -224,7 +223,6 @@ class WordleApp(tk.Tk):
                 self.add_log("Ad element hidden (dynamic class handled).")
             except Exception as ex:
                 self.add_log(f"Error hiding ad: {ex}")
-                return
 
         except Exception as ex:
             self.add_log(f"Error in run_solver: {ex}")
