@@ -183,6 +183,7 @@ class WordleApp(tk.Tk):
                 self.add_log("Clicked 'Accept all' button.")
             except Exception as ex:
                 self.add_log(f"'Accept all' button not found or not clickable: {ex}")
+                return
 
             # 2) Click "Play" button (start the game) if present
             play_xpath = "//button[contains(text(),'Play')]"
@@ -200,6 +201,30 @@ class WordleApp(tk.Tk):
                 self.add_log("Clicked 'Play' button via JS.")
             except Exception as ex:
                 self.add_log(f"'Play' button not found or not clickable: {ex}")
+                return
+
+            # Close modal
+            try:
+                close_btn = WebDriverWait(self.driver, 10).until(
+                    EC.element_to_be_clickable((By.CSS_SELECTOR, "#help-dialog > div > div > button"))
+                )
+                close_btn.click()
+                self.add_log("Clicked 'Close' button.")
+            except Exception as ex:
+                self.add_log(f"'Close' button not found or not clickable: {ex}")
+                return
+
+            try:
+                self.driver.execute_script(
+                    """
+                    let ad = document.querySelector("div[class^='Ad-module_adContainer__']");
+                    if(ad) { ad.style.display = 'none'; }
+                """
+                )
+                self.add_log("Ad element hidden (dynamic class handled).")
+            except Exception as ex:
+                self.add_log(f"Error hiding ad: {ex}")
+                return
 
         except Exception as ex:
             self.add_log(f"Error in run_solver: {ex}")
