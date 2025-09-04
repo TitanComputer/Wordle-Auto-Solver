@@ -8,6 +8,8 @@ from PIL import Image, ImageTk
 from solver import WordleSolver, LetterFrequencyAnalyzer
 
 from selenium import webdriver
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
@@ -134,7 +136,6 @@ class WordleApp(tk.Tk):
     def run_solver(self):
         base_dir = os.path.dirname(os.path.abspath(__file__))
         chrome_path = os.path.join(base_dir, "assets", "chromedriver.exe")
-        words_file = os.path.join(base_dir, "assets", "words_sorted.txt")
 
         if not os.path.exists(chrome_path):
             self.add_log(f"Chromedriver not found at: {chrome_path}")
@@ -145,148 +146,73 @@ class WordleApp(tk.Tk):
         try:
             service = Service(chrome_path)
             options = webdriver.ChromeOptions()
+            # keep browser visible (do not use headless)
             options.add_argument("--disable-gpu")
+            options.add_argument("--no-sandbox")
+            options.add_argument("--disable-dev-shm-usage")
+
             self.driver = webdriver.Chrome(service=service, options=options)
             self.add_log("Chrome started.")
             self.driver.get("https://www.nytimes.com/games/wordle/index.html")
-            time.sleep(1.2)
+
+            wait = WebDriverWait(self.driver, 25)
+
+            # wait until document.readyState == 'complete'
             try:
-                body = self.driver.find_element(By.TAG_NAME, "body")
-                body.send_keys(Keys.ESCAPE)
-            except Exception:
-                pass
+                wait.until(lambda d: d.execute_script("return document.readyState") == "complete")
+                self.add_log("Page load complete.")
+            except Exception as e:
+                self.add_log(f"Timeout waiting for full page load: {e}")
 
-            if os.path.exists(words_file):
-                with open(words_file, "r", encoding="utf-8") as f:
-                    words = [w.strip() for w in f if w.strip()]
-            else:
-                self.add_log(f"Words file not found: {words_file}")
-                words = []
-
-            if not words:
-                self.add_log("No words loaded. Aborting solver.")
+            # if user pressed Stop meanwhile, stop
+            if not self.running:
+                self.add_log("Stopped by user before clicking buttons.")
                 return
 
-            analyzer = LetterFrequencyAnalyzer(input_path=words_file)
-            analyzer.analyze()
-            solver = WordleSolver(words)
+            # 1) Click "Accept all" (cookie consent) if present
+            try:
+                accept_btn = WebDriverWait(self.driver, 15).until(
+                    EC.element_to_be_clickable(
+                        (
+                            By.CSS_SELECTOR,
+                            "#fides-button-group > div.fides-banner-button-group.fides-banner-primary-actions > button.fides-banner-button.fides-banner-button-primary.fides-accept-all-button",
+                        )
+                    )
+                )
+                accept_btn.click()
+                self.add_log("Clicked 'Accept all' button.")
+            except Exception as ex:
+                self.add_log(f"'Accept all' button not found or not clickable: {ex}")
 
-            known_pattern = [None] * 5
-            excluded_letters = set()
-            present_letters = set()
-            candidates = words.copy()
-            solved = False
-
-            for attempt in range(6):
-                self.check_driver()
-                if not self.running:
-                    break
-                if not self.running:
-                    self.add_log("Stopped by user.")
-                    break
-
-                top = analyzer.suggest_best_words(word_list=candidates, top_n=1)
-                guess = top[0][0] if top else (candidates[0] if candidates else None)
-
-                if not guess:
-                    self.add_log("No candidate available. Stopping.")
-                    break
-
-                self.add_log(f"Trying word: {guess} (attempt {attempt+1})")
-
-                try:
-                    body = self.driver.find_element(By.TAG_NAME, "body")
-                    for ch in guess:
-                        body.send_keys(ch)
-                        time.sleep(0.06)
-                    body.send_keys(Keys.ENTER)
-                except Exception as ex:
-                    self.add_log(f"Error sending keys: {ex}")
-                    break
-
-                evals = None
-                wait_until = time.time() + 12
-                while time.time() < wait_until:
-                    if not self.running:
-                        break
-                    try:
-                        script = f"""
-const app = document.querySelector('game-app');
-if(!app) return null;
-const shadow = app.shadowRoot;
-const rows = shadow.querySelectorAll('game-row');
-if(rows.length <= {attempt}) return null;
-const row = rows[{attempt}];
-const tiles = row.shadowRoot.querySelectorAll('game-tile');
-if(!tiles) return null;
-let arr = [];
-tiles.forEach(t => {{
-  arr.push({{letter: t.getAttribute('letter'), evaluation: t.getAttribute('evaluation')}})
-}});
-return arr;
-"""
-                        res = self.driver.execute_script(script)
-                    except (WebDriverException, JavascriptException):
-                        res = None
-                    if res and isinstance(res, list) and all(tile.get("evaluation") for tile in res):
-                        evals = res
-                        break
-                    time.sleep(0.18)
-
-                if not evals:
-                    self.add_log("No evaluation received (timeout).")
-                    continue
-
-                row_letters = [tile.get("letter") for tile in evals]
-                row_states = [tile.get("evaluation") for tile in evals]
-                self.add_log("Result: " + ", ".join(f"{l}:{s}" for l, s in zip(row_letters, row_states)))
-
-                if all(s == "correct" for s in row_states):
-                    solution = "".join(row_letters)
-                    self.add_log(f"Solved! Word is: {solution}")
-                    self.last_solution = solution
-                    messagebox.showinfo("Solved", f"Solution: {solution}")
-                    solved = True
-                    break
-
-                row_present_letters = {letter for letter, state in zip(row_letters, row_states) if state == "present"}
-                for idx, (letter, state) in enumerate(zip(row_letters, row_states)):
-                    if state == "correct":
-                        known_pattern[idx] = letter
-                        present_letters.add(letter)
-                    elif state == "present":
-                        present_letters.add(letter)
-                    elif (
-                        state == "absent"
-                        and letter not in row_present_letters
-                        and letter not in present_letters
-                        and letter not in known_pattern
-                    ):
-                        excluded_letters.add(letter)
-
-                unknowns = [
-                    (idx, letter)
-                    for idx, (letter, state) in enumerate(zip(row_letters, row_states))
-                    if state == "present"
-                ]
-                candidates = solver.filter_candidates(known_pattern, unknowns, list(excluded_letters))
-                self.add_log(f"Candidates remaining: {len(candidates)}")
-                time.sleep(0.4)
-
-            if not solved and self.running:
-                self.add_log("Solver finished without solution.")
+            # 2) Click "Play" button (start the game) if present
+            play_xpath = "//button[contains(text(),'Play')]"
+            try:
+                btn_play = WebDriverWait(self.driver, 15).until(EC.presence_of_element_located((By.XPATH, play_xpath)))
+                # remove overlay via JS
+                self.driver.execute_script(
+                    """
+                    let overlay = document.querySelector('.fides-modal-overlay');
+                    if(overlay) overlay.remove();
+                """
+                )
+                # now click via JS
+                self.driver.execute_script("arguments[0].click();", btn_play)
+                self.add_log("Clicked 'Play' button via JS.")
+            except Exception as ex:
+                self.add_log(f"'Play' button not found or not clickable: {ex}")
 
         except Exception as ex:
-            self.add_log(f"Error: {ex}")
-        finally:
-            if self.driver:
-                try:
+            self.add_log(f"Error in run_solver: {ex}")
+            # cleanup on error
+            try:
+                if self.driver:
                     self.driver.quit()
-                except:
-                    pass
+            except Exception:
+                pass
             self.driver = None
             self.running = False
             self.start_button.config(text="Start")
+        # do NOT quit the driver here on success — leave it open so Stop button can close it later
 
     def translate_word(self):
         if not self.last_solution:
