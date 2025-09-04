@@ -3,7 +3,7 @@ import threading
 import time
 import requests
 import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import ttk, messagebox, PhotoImage
 from PIL import Image, ImageTk
 from solver import WordleSolver, LetterFrequencyAnalyzer
 
@@ -13,13 +13,20 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.common.exceptions import WebDriverException, JavascriptException
 
+APP_VERSION = "1.0.0"
+
 
 class WordleApp(tk.Tk):
     def __init__(self):
         super().__init__()
 
-        self.title("Wordle Auto-Solver")
-        self.geometry("300x500")
+        self.title(f"Wordle Auto-Solver v{APP_VERSION}")
+        self.geometry("310x400")
+        self.icon = PhotoImage(file=self.resource_path(os.path.join("assets", "icon.png")))
+        self.withdraw()
+        self.iconphoto(False, self.icon)
+        self.center_window()
+        self.deiconify()
         self.resizable(False, False)
 
         # # ttk Style manager
@@ -44,7 +51,7 @@ class WordleApp(tk.Tk):
         self.start_button.pack(pady=5, fill=tk.X, padx=10)
 
         # Log box
-        self.log_box = tk.Text(self, height=20, width=40, state=tk.DISABLED)
+        self.log_box = tk.Text(self, height=10, width=40, state=tk.DISABLED)
         self.log_box.pack(pady=5, padx=10, fill=tk.BOTH, expand=True)
 
         # Translate button
@@ -65,6 +72,20 @@ class WordleApp(tk.Tk):
             donate_frame, text="Donate", command=self.open_donate_page, image=self.heart_photo, compound="right"
         )
         self.donate_button.pack(fill=tk.X, padx=10)
+
+    def resource_path(self, relative_path):
+        temp_dir = os.path.dirname(__file__)
+        return os.path.join(temp_dir, relative_path)
+
+    def center_window(self):
+        self.update_idletasks()  # make sure geometry info is updated
+        width = self.winfo_width()
+        height = self.winfo_height()
+        screen_width = self.winfo_screenwidth()
+        screen_height = self.winfo_screenheight()
+        x = (screen_width // 2) - (width // 2)
+        y = (screen_height // 2) - (height // 2)
+        self.geometry(f"{width}x{height}+{x}+{y}")
 
     # def change_theme(self, event=None):
     #     selected = self.theme_var.get()
