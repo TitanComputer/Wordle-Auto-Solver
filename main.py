@@ -236,6 +236,139 @@ class WordleApp(tk.Tk):
             except Exception as ex:
                 self.add_log(f"Error hiding ad: {ex}")
 
+            # === prepare analyzer and words ===
+            try:
+                words_file = os.path.join(base_dir, "assets", "words_sorted.txt")
+                with open(words_file, "r", encoding="utf-8") as f:
+                    words = [w.strip() for w in f if w.strip()]
+
+                # analyzer را با مسیر فایل مقداردهی کن (تو خودت قبلاً اشاره کردی)
+                analyzer = LetterFrequencyAnalyzer(words_file)
+                analyzer.analyze()
+
+                # بهترین کلمهٔ اول را بگیر
+                top = analyzer.suggest_best_words(word_list=words, top_n=1)
+                if not top:
+                    self.add_log("No candidate words found in words_sorted.txt")
+                    # می‌تونی return یا ادامه بدی
+                first_guess = top[0][0]
+                self.add_log(f"First guess selected: {first_guess}")
+                time.sleep(0.12)
+
+                # === send the word to the page ===
+                # روش ساده و معمول: ارسال روی body سپس ENTER
+                try:
+                    body = self.driver.find_element(By.TAG_NAME, "body")
+                    # تایپ آهسته با تاخیر کوچک تا کلیدها از دست نروند
+                    for ch in first_guess:
+                        body.send_keys(ch)
+                        time.sleep(0.12)  # اگر miss دیدی این مقدار رو 0.1 یا 0.12 کن
+                    body.send_keys(Keys.ENTER)
+                    self.add_log(f"Sent '{first_guess}' to page (typed into body).")
+                except Exception as e_send:
+                    # fallback: ارسال با JS (اگر send_keys به هر دلیلی کار نکرد)
+                    try:
+                        for ch in first_guess:
+                            self.driver.execute_script(
+                                "document.body.dispatchEvent(new KeyboardEvent('keydown', {key: arguments[0]}));", ch
+                            )
+                            time.sleep(0.08)
+                        self.driver.execute_script(
+                            "document.body.dispatchEvent(new KeyboardEvent('keydown', {key: 'Enter'}));"
+                        )
+                        self.add_log(f"Sent '{first_guess}' via JS fallback.")
+                    except Exception as e_js:
+                        self.add_log(f"Failed to send first guess: {e_send} / {e_js}")
+                        raise
+
+                # === wait & read Row 1 results ===
+                # polling امن: تا حداکثر timeout صبر می‌کنیم تا 5 خانه وضعیت بگیرند
+                row_script = """
+                (function(){
+                    // find row by different possible selectors (robust)
+                    let sel = document.querySelector('game-row[aria-label=\"Row 1\"]') 
+                        || document.querySelector('div[aria-label=\"Row 1\"]') 
+                        || document.querySelector('[aria-label=\"Row 1\"]');
+                    if(!sel) return null;
+                    // pick tiles (try game-tile, data-testid tile, or any child div)
+                    let tiles = sel.querySelectorAll('game-tile, [data-testid=\"tile\"], div.Tile-module_tile__UWEHN, div');
+                    if(!tiles || tiles.length < 5) return null;
+                    let arr = [];
+                    for(let i=0;i<5;i++){
+                        let t = tiles[i];
+                        let letter = (t.getAttribute('letter') || t.textContent || '').trim().toLowerCase();
+                        let state = t.getAttribute('data-state') || t.getAttribute('evaluation') || '';
+                        // fallback: try to infer from aria-label text
+                        if(!state){
+                            let aria = (t.getAttribute('aria-label')||'').toLowerCase();
+                            if(aria.includes('correct')) state='correct';
+                            else if(aria.includes('present')) state='present';
+                            else if(aria.includes('absent')) state='absent';
+                        }
+                        arr.push({letter: letter, state: state || null});
+                    }
+                    return arr;
+                })();
+                """
+
+                row1 = None
+                timeout = 10.0
+                poll = 0.25
+                start = time.time()
+                while time.time() - start < timeout:
+                    try:
+                        row1 = self.driver.execute_script(row_script)
+                    except Exception:
+                        row1 = None
+                    if row1 and all(item["state"] for item in row1):
+                        break
+                    time.sleep(poll)
+
+                if not row1:
+                    self.add_log("Row 1 not ready (timeout).")
+                    # می‌تونی اینجا retry بزنی یا خروجی بدی — فعلاً stop
+                else:
+                    self.add_log(f"Row 1 states: {row1}")  # row1 لیستی از {letter, state}
+
+                    # === تبدیل نتایج به ورودی WordleSolver ===
+                    known_pattern = [None] * 5
+                    present_letters = set()
+                    excluded_letters = set()
+
+                    # جمع‌آوری present letters برای handling تکراری‌ها
+                    row_present = {item["letter"] for item in row1 if item["state"] == "present"}
+
+                    for idx, item in enumerate(row1):
+                        l = item["letter"]
+                        s = item["state"]
+                        if s == "correct":
+                            known_pattern[idx] = l
+                            present_letters.add(l)
+                        elif s == "present":
+                            present_letters.add(l)
+                        elif s == "absent":
+                            # اگر این حرف در همین ردیف present یا correct نیست، به excluded اضافه کن
+                            if (l not in row_present) and (l not in present_letters) and (l not in known_pattern):
+                                excluded_letters.add(l)
+
+                    self.add_log(f"known_pattern: {known_pattern}")
+                    self.add_log(f"present_letters: {sorted(list(present_letters))}")
+                    self.add_log(f"excluded_letters: {sorted(list(excluded_letters))}")
+
+                    # === فیلتر کاندیدها با WordleSolver ===
+                    solver = WordleSolver(words)  # words از فایل assets/words_sorted.txt
+                    unknowns = [(i, item["letter"]) for i, item in enumerate(row1) if item["state"] == "present"]
+                    candidates = solver.filter_candidates(known_pattern, unknowns, list(excluded_letters))
+                    self.add_log(f"Candidates after Row1: {len(candidates)}")
+
+                    # اگر بخوای بهترین گزینهٔ بعدی رو هم انتخاب کنیم:
+                    if candidates:
+                        next_best = analyzer.suggest_best_words(word_list=candidates, top_n=1)[0][0]
+                        self.add_log(f"Next best guess (for Row 2): {next_best}")
+
+            except Exception as ex_first:
+                self.add_log(f"Error during first-guess sequence: {ex_first}")
+
         except Exception as ex:
             self.add_log(f"Error in run_solver: {ex}")
             # cleanup on error
