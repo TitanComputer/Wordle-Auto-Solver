@@ -30,6 +30,7 @@ class WordleApp(tk.Tk):
         self.center_window()
         self.deiconify()
         self.resizable(False, False)
+        self.protocol("WM_DELETE_WINDOW", self.on_close)
 
         # # ttk Style manager
         # self.style = ttk.Style()
@@ -74,6 +75,17 @@ class WordleApp(tk.Tk):
             donate_frame, text="Donate", command=self.open_donate_page, image=self.heart_photo, compound="right"
         )
         self.donate_button.pack(fill=tk.X, padx=10)
+
+    def on_close(self):
+        if self.driver:
+            try:
+                self.driver.quit()
+            except Exception:
+                pass
+            self.driver = None
+
+        self.running = False
+        self.destroy()
 
     def check_driver(self):
         if self.driver:
