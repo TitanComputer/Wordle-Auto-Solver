@@ -282,63 +282,37 @@ class WordleApp(tk.Tk):
                         raise
 
                 # === wait & read Row 1 results ===
-                # polling امن: تا حداکثر timeout صبر می‌کنیم تا 5 خانه وضعیت بگیرند
-                row_script = """
-                (function(){
-                    // find row by different possible selectors (robust)
-                    let sel = document.querySelector('game-row[aria-label=\"Row 1\"]') 
-                        || document.querySelector('div[aria-label=\"Row 1\"]') 
-                        || document.querySelector('[aria-label=\"Row 1\"]');
-                    if(!sel) return null;
-                    // pick tiles (try game-tile, data-testid tile, or any child div)
-                    let tiles = sel.querySelectorAll('game-tile, [data-testid=\"tile\"], div.Tile-module_tile__UWEHN, div');
-                    if(!tiles || tiles.length < 5) return null;
-                    let arr = [];
-                    for(let i=0;i<5;i++){
-                        let t = tiles[i];
-                        let letter = (t.getAttribute('letter') || t.textContent || '').trim().toLowerCase();
-                        let state = t.getAttribute('data-state') || t.getAttribute('evaluation') || '';
-                        // fallback: try to infer from aria-label text
-                        if(!state){
-                            let aria = (t.getAttribute('aria-label')||'').toLowerCase();
-                            if(aria.includes('correct')) state='correct';
-                            else if(aria.includes('present')) state='present';
-                            else if(aria.includes('absent')) state='absent';
-                        }
-                        arr.push({letter: letter, state: state || null});
-                    }
-                    return arr;
-                })();
-                """
+                try:
+                    row1 = WebDriverWait(self.driver, 10).until(
+                        EC.presence_of_element_located((By.CSS_SELECTOR, "div[aria-label='Row 1']"))
+                    )
 
-                row1 = None
-                timeout = 10.0
-                poll = 0.25
-                start = time.time()
-                while time.time() - start < timeout:
-                    try:
-                        row1 = self.driver.execute_script(row_script)
-                    except Exception:
-                        row1 = None
-                    if row1 and all(item["state"] for item in row1):
-                        break
-                    time.sleep(poll)
+                    # صبر تا همه data-state ها از "tbd" خارج بشن
+                    def row_ready(driver):
+                        tiles = row1.find_elements(By.CSS_SELECTOR, "div.Tile-module_tile__UWEHN")
+                        states = [t.get_attribute("data-state") for t in tiles]
+                        return all(s and s != "tbd" for s in states)
 
-                if not row1:
-                    self.add_log("Row 1 not ready (timeout).")
-                    # می‌تونی اینجا retry بزنی یا خروجی بدی — فعلاً stop
-                else:
-                    self.add_log(f"Row 1 states: {row1}")  # row1 لیستی از {letter, state}
+                    WebDriverWait(self.driver, 10).until(row_ready)
 
-                    # === تبدیل نتایج به ورودی WordleSolver ===
+                    # حالا نتایج نهایی رو بخون
+                    tiles = row1.find_elements(By.CSS_SELECTOR, "div.Tile-module_tile__UWEHN")
+                    results = []
+                    for tile in tiles:
+                        letter = tile.text.strip().lower()
+                        state = tile.get_attribute("data-state")
+                        results.append({"letter": letter, "state": state})
+
+                    self.add_log(f"Row 1 states: {results}")
+
+                    # === ادامهٔ پردازش مثل قبل ===
                     known_pattern = [None] * 5
                     present_letters = set()
                     excluded_letters = set()
 
-                    # جمع‌آوری present letters برای handling تکراری‌ها
-                    row_present = {item["letter"] for item in row1 if item["state"] == "present"}
+                    row_present = {item["letter"] for item in results if item["state"] == "present"}
 
-                    for idx, item in enumerate(row1):
+                    for idx, item in enumerate(results):
                         l = item["letter"]
                         s = item["state"]
                         if s == "correct":
@@ -347,7 +321,6 @@ class WordleApp(tk.Tk):
                         elif s == "present":
                             present_letters.add(l)
                         elif s == "absent":
-                            # اگر این حرف در همین ردیف present یا correct نیست، به excluded اضافه کن
                             if (l not in row_present) and (l not in present_letters) and (l not in known_pattern):
                                 excluded_letters.add(l)
 
@@ -355,16 +328,23 @@ class WordleApp(tk.Tk):
                     self.add_log(f"present_letters: {sorted(list(present_letters))}")
                     self.add_log(f"excluded_letters: {sorted(list(excluded_letters))}")
 
-                    # === فیلتر کاندیدها با WordleSolver ===
-                    solver = WordleSolver(words)  # words از فایل assets/words_sorted.txt
-                    unknowns = [(i, item["letter"]) for i, item in enumerate(row1) if item["state"] == "present"]
+                    solver = WordleSolver(words)
+                    unknowns = [(i, item["letter"]) for i, item in enumerate(results) if item["state"] == "present"]
                     candidates = solver.filter_candidates(known_pattern, unknowns, list(excluded_letters))
-                    self.add_log(f"Candidates after Row1: {len(candidates)}")
+                    self.add_log(f"Candidates after Row 1: {len(candidates)}")
 
-                    # اگر بخوای بهترین گزینهٔ بعدی رو هم انتخاب کنیم:
                     if candidates:
                         next_best = analyzer.suggest_best_words(word_list=candidates, top_n=1)[0][0]
                         self.add_log(f"Next best guess (for Row 2): {next_best}")
+
+                except Exception as e:
+                    self.add_log(f"Error reading Row 1: {e}")
+
+                # time.sleep(3)  # صبر برای تغییر وضعیت
+                # page_html = self.driver.page_source
+                # with open("debug_page.html", "w", encoding="utf-8") as f:
+                #     f.write(page_html)
+                # self.add_log("Saved debug_page.html for inspection.")
 
             except Exception as ex_first:
                 self.add_log(f"Error during first-guess sequence: {ex_first}")
