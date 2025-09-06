@@ -322,36 +322,36 @@ class WordleApp(tk.Tk):
                     if all(item["state"] == "correct" for item in results):
                         self.add_log(f"🎉 Solved! The word is '{guess}'.")
                         solved = True
-                        # try to close the stats modal (exit button)
-                        try:
-                            close_stats = WebDriverWait(self.driver, 5).until(
-                                EC.element_to_be_clickable(
-                                    (
-                                        By.CSS_SELECTOR,
-                                        "#loginPrompt-dialog button.Modal-module_closeIconButton__y9b6c, #loginPrompt-dialog div[class^='Modal-module_fullscreenStatsExit__'] > div > button",
-                                    )
-                                )
-                            )
-                            close_stats.click()
-                            self.add_log("Clicked final 'Close' button (stats modal).")
-                        except Exception as ex:
-                            self.add_log(f"Stats modal close button not found or not clickable: {ex}")
 
-                        # --- Close second stats modal (regiwall) ---
                         try:
-                            close_regiwall = WebDriverWait(self.driver, 5).until(
-                                EC.element_to_be_clickable(
-                                    (
-                                        By.CSS_SELECTOR,
-                                        "#regiwall-dialog div[class^='Modal-module_fullscreenStatsExit__'] > div > button",
-                                    )
-                                )
+                            # صبر می‌کنیم تا #loginPrompt-dialog ظاهر بشه (حداکثر 10 ثانیه)
+                            WebDriverWait(self.driver, 10).until(
+                                EC.presence_of_element_located((By.ID, "loginPrompt-dialog"))
                             )
-                            close_regiwall.click()
-                            self.add_log("Clicked second 'Close' button (regiwall modal).")
+                            self.driver.execute_script(
+                                """
+                                let el = document.querySelector("#loginPrompt-dialog");
+                                if (el) { el.remove(); }
+                            """
+                            )
+                            self.add_log("Removed #loginPrompt-dialog from DOM.")
                         except Exception as ex:
-                            self.add_log(f"Regiwall modal close button not found or not clickable: {ex}")
+                            self.add_log(f"#loginPrompt-dialog not found or could not be removed: {ex}")
 
+                        try:
+                            WebDriverWait(self.driver, 10).until(
+                                EC.presence_of_element_located((By.CSS_SELECTOR, "[id^='lire-ui-']"))
+                            )
+                            self.driver.execute_script(
+                                """
+                                document.querySelectorAll("[id^='lire-ui-']").forEach(el => el.remove());
+                            """
+                            )
+                            self.add_log("Removed all elements with id starting with 'lire-ui-'.")
+                        except Exception as ex:
+                            self.add_log(
+                                f"No elements with id starting with 'lire-ui-' found or could not be removed: {ex}"
+                            )
                         break
 
                     # update knowledge: known_pattern, present_letters, excluded_letters, unknowns (accumulate)
