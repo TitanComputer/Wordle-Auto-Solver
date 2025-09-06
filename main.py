@@ -245,23 +245,27 @@ class WordleApp(tk.Tk):
                 analyzer = LetterFrequencyAnalyzer(words_file)
                 analyzer.analyze()
 
+                # --- start of replacement loop ---
                 solver = WordleSolver(words)
-
                 known_pattern = [None] * 5
                 present_letters = set()
                 excluded_letters = set()
-
-                current_candidates = words[:]  # همه کلمات در شروع
+                unknowns = []  # list of (index, letter) accumulated across attempts
+                current_candidates = words[:]  # start with all words
                 max_attempts = 6
+                solved = False
                 time.sleep(0.2)
 
                 for attempt in range(1, max_attempts + 1):
-                    # انتخاب بهترین کلمه
-                    guess = analyzer.suggest_best_words(word_list=current_candidates, top_n=1)[0][0]
-
+                    # choose best guess from current candidates using analyzer
+                    top = analyzer.suggest_best_words(word_list=current_candidates, top_n=1)
+                    if not top:
+                        self.add_log("No candidate for guessing. Stopping.")
+                        break
+                    guess = top[0][0]
                     self.add_log(f"Attempt {attempt}: guessing '{guess}'")
 
-                    # ارسال کلمه به صفحه
+                    # send guess
                     try:
                         body = self.driver.find_element(By.TAG_NAME, "body")
                         for ch in guess:
@@ -273,59 +277,88 @@ class WordleApp(tk.Tk):
                         self.add_log(f"Failed to send guess '{guess}': {e_send}")
                         break
 
-                    # صبر تا نتایج این ردیف حاضر بشن
+                    # wait for row element to appear
                     row_selector = f"div[aria-label='Row {attempt}']"
                     try:
-                        row_elem = WebDriverWait(self.driver, 10).until(
+                        row_elem = WebDriverWait(self.driver, 12).until(
                             EC.presence_of_element_located((By.CSS_SELECTOR, row_selector))
                         )
-
-                        def row_ready(driver):
-                            tiles = row_elem.find_elements(By.CSS_SELECTOR, "div.Tile-module_tile__UWEHN")
-                            states = [t.get_attribute("data-state") for t in tiles]
-                            return all(s and s != "tbd" for s in states)
-
-                        WebDriverWait(self.driver, 10).until(row_ready)
-
-                        # نتایج رو بخون
-                        tiles = row_elem.find_elements(By.CSS_SELECTOR, "div.Tile-module_tile__UWEHN")
-                        results = []
-                        for tile in tiles:
-                            letter = tile.text.strip().lower()
-                            state = tile.get_attribute("data-state")
-                            results.append({"letter": letter, "state": state})
-
-                        self.add_log(f"Row {attempt} states: {results}")
-
                     except Exception as e:
-                        self.add_log(f"Error reading Row {attempt}: {e}")
+                        self.add_log(f"Row {attempt} element not found: {e}")
                         break
 
-                    # بررسی برنده شدن
+                    # wait until all tiles in this row have a final state (not 'tbd' or empty)
+                    wait_start = time.time()
+                    tiles = []
+                    while time.time() - wait_start < 12:
+                        tiles = row_elem.find_elements(By.CSS_SELECTOR, "div.Tile-module_tile__UWEHN")
+                        if len(tiles) >= 5:
+                            states = [t.get_attribute("data-state") or "" for t in tiles[:5]]
+                            if all(s and ("tbd" not in s.lower()) for s in states):
+                                break
+                        time.sleep(0.18)
+                    else:
+                        self.add_log(f"Row {attempt} not ready (timeout).")
+                        break
+
+                    # read results
+                    results = []
+                    for t in tiles[:5]:
+                        letter = (t.text or "").strip().lower()
+                        state = t.get_attribute("data-state")
+                        if not state:
+                            aria = (t.get_attribute("aria-label") or "").lower()
+                            if "correct" in aria:
+                                state = "correct"
+                            elif "present" in aria:
+                                state = "present"
+                            elif "absent" in aria:
+                                state = "absent"
+                        results.append({"letter": letter, "state": state})
+
+                    self.add_log(f"Row {attempt} states: {results}")
+
+                    # check win
                     if all(item["state"] == "correct" for item in results):
                         self.add_log(f"🎉 Solved! The word is '{guess}'.")
+                        solved = True
                         break
 
-                    # آپدیت pattern برای فیلتر کلمات بعدی
+                    # update knowledge: known_pattern, present_letters, excluded_letters, unknowns (accumulate)
                     row_present = {item["letter"] for item in results if item["state"] == "present"}
+
                     for idx, item in enumerate(results):
                         l = item["letter"]
                         s = item["state"]
+                        if not l:
+                            continue
                         if s == "correct":
                             known_pattern[idx] = l
                             present_letters.add(l)
+                            if l in excluded_letters:
+                                excluded_letters.discard(l)
                         elif s == "present":
                             present_letters.add(l)
+                            if l in excluded_letters:
+                                excluded_letters.discard(l)
+                            if (idx, l) not in unknowns:
+                                unknowns.append((idx, l))
                         elif s == "absent":
-                            if (l not in row_present) and (l not in present_letters) and (l not in known_pattern):
+                            # only add to excluded if we have no evidence that letter exists elsewhere
+                            # (not present in any discovered present/correct and not in unknowns)
+                            if (
+                                (l not in present_letters)
+                                and (l not in known_pattern)
+                                and (not any(u[1] == l for u in unknowns))
+                            ):
                                 excluded_letters.add(l)
 
                     self.add_log(f"known_pattern: {known_pattern}")
                     self.add_log(f"present_letters: {sorted(list(present_letters))}")
                     self.add_log(f"excluded_letters: {sorted(list(excluded_letters))}")
+                    self.add_log(f"unknowns (accumulated): {unknowns}")
 
-                    unknowns = [(i, item["letter"]) for i, item in enumerate(results) if item["state"] == "present"]
-
+                    # filter candidates using accumulated constraints
                     current_candidates = solver.filter_candidates(known_pattern, unknowns, list(excluded_letters))
                     self.add_log(f"Candidates left: {len(current_candidates)}")
 
@@ -333,8 +366,13 @@ class WordleApp(tk.Tk):
                         self.add_log("No candidates left. Stopping.")
                         break
 
-                else:
-                    self.add_log("❌ All 6 attempts used. No solution found.")
+                    # small delay before next attempt
+                    time.sleep(0.4)
+
+                # end of attempts
+                if not solved and current_candidates:
+                    self.add_log("Solver finished (did not find solution within attempts).")
+                # --- end of replacement loop ---
 
             except Exception as ex_first:
                 self.add_log(f"Error during solving loop: {ex_first}")
