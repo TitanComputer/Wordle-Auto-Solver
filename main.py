@@ -242,76 +242,72 @@ class WordleApp(tk.Tk):
                 with open(words_file, "r", encoding="utf-8") as f:
                     words = [w.strip() for w in f if w.strip()]
 
-                # analyzer را با مسیر فایل مقداردهی کن (تو خودت قبلاً اشاره کردی)
                 analyzer = LetterFrequencyAnalyzer(words_file)
                 analyzer.analyze()
 
-                # بهترین کلمهٔ اول را بگیر
-                top = analyzer.suggest_best_words(word_list=words, top_n=1)
-                if not top:
-                    self.add_log("No candidate words found in words_sorted.txt")
-                    # می‌تونی return یا ادامه بدی
-                first_guess = top[0][0]
-                self.add_log(f"First guess selected: {first_guess}")
-                time.sleep(0.12)
+                solver = WordleSolver(words)
 
-                # === send the word to the page ===
-                # روش ساده و معمول: ارسال روی body سپس ENTER
-                try:
-                    body = self.driver.find_element(By.TAG_NAME, "body")
-                    # تایپ آهسته با تاخیر کوچک تا کلیدها از دست نروند
-                    for ch in first_guess:
-                        body.send_keys(ch)
-                        time.sleep(0.12)  # اگر miss دیدی این مقدار رو 0.1 یا 0.12 کن
-                    body.send_keys(Keys.ENTER)
-                    self.add_log(f"Sent '{first_guess}' to page (typed into body).")
-                except Exception as e_send:
-                    # fallback: ارسال با JS (اگر send_keys به هر دلیلی کار نکرد)
+                known_pattern = [None] * 5
+                present_letters = set()
+                excluded_letters = set()
+
+                current_candidates = words[:]  # همه کلمات در شروع
+                max_attempts = 6
+                time.sleep(0.2)
+
+                for attempt in range(1, max_attempts + 1):
+                    # انتخاب بهترین کلمه
+                    guess = analyzer.suggest_best_words(word_list=current_candidates, top_n=1)[0][0]
+
+                    self.add_log(f"Attempt {attempt}: guessing '{guess}'")
+
+                    # ارسال کلمه به صفحه
                     try:
-                        for ch in first_guess:
-                            self.driver.execute_script(
-                                "document.body.dispatchEvent(new KeyboardEvent('keydown', {key: arguments[0]}));", ch
-                            )
-                            time.sleep(0.08)
-                        self.driver.execute_script(
-                            "document.body.dispatchEvent(new KeyboardEvent('keydown', {key: 'Enter'}));"
+                        body = self.driver.find_element(By.TAG_NAME, "body")
+                        for ch in guess:
+                            body.send_keys(ch)
+                            time.sleep(0.12)
+                        body.send_keys(Keys.ENTER)
+                        self.add_log(f"Sent '{guess}' to page (typed into body).")
+                    except Exception as e_send:
+                        self.add_log(f"Failed to send guess '{guess}': {e_send}")
+                        break
+
+                    # صبر تا نتایج این ردیف حاضر بشن
+                    row_selector = f"div[aria-label='Row {attempt}']"
+                    try:
+                        row_elem = WebDriverWait(self.driver, 10).until(
+                            EC.presence_of_element_located((By.CSS_SELECTOR, row_selector))
                         )
-                        self.add_log(f"Sent '{first_guess}' via JS fallback.")
-                    except Exception as e_js:
-                        self.add_log(f"Failed to send first guess: {e_send} / {e_js}")
-                        raise
 
-                # === wait & read Row 1 results ===
-                try:
-                    row1 = WebDriverWait(self.driver, 10).until(
-                        EC.presence_of_element_located((By.CSS_SELECTOR, "div[aria-label='Row 1']"))
-                    )
+                        def row_ready(driver):
+                            tiles = row_elem.find_elements(By.CSS_SELECTOR, "div.Tile-module_tile__UWEHN")
+                            states = [t.get_attribute("data-state") for t in tiles]
+                            return all(s and s != "tbd" for s in states)
 
-                    # صبر تا همه data-state ها از "tbd" خارج بشن
-                    def row_ready(driver):
-                        tiles = row1.find_elements(By.CSS_SELECTOR, "div.Tile-module_tile__UWEHN")
-                        states = [t.get_attribute("data-state") for t in tiles]
-                        return all(s and s != "tbd" for s in states)
+                        WebDriverWait(self.driver, 10).until(row_ready)
 
-                    WebDriverWait(self.driver, 10).until(row_ready)
+                        # نتایج رو بخون
+                        tiles = row_elem.find_elements(By.CSS_SELECTOR, "div.Tile-module_tile__UWEHN")
+                        results = []
+                        for tile in tiles:
+                            letter = tile.text.strip().lower()
+                            state = tile.get_attribute("data-state")
+                            results.append({"letter": letter, "state": state})
 
-                    # حالا نتایج نهایی رو بخون
-                    tiles = row1.find_elements(By.CSS_SELECTOR, "div.Tile-module_tile__UWEHN")
-                    results = []
-                    for tile in tiles:
-                        letter = tile.text.strip().lower()
-                        state = tile.get_attribute("data-state")
-                        results.append({"letter": letter, "state": state})
+                        self.add_log(f"Row {attempt} states: {results}")
 
-                    self.add_log(f"Row 1 states: {results}")
+                    except Exception as e:
+                        self.add_log(f"Error reading Row {attempt}: {e}")
+                        break
 
-                    # === ادامهٔ پردازش مثل قبل ===
-                    known_pattern = [None] * 5
-                    present_letters = set()
-                    excluded_letters = set()
+                    # بررسی برنده شدن
+                    if all(item["state"] == "correct" for item in results):
+                        self.add_log(f"🎉 Solved! The word is '{guess}'.")
+                        break
 
+                    # آپدیت pattern برای فیلتر کلمات بعدی
                     row_present = {item["letter"] for item in results if item["state"] == "present"}
-
                     for idx, item in enumerate(results):
                         l = item["letter"]
                         s = item["state"]
@@ -328,26 +324,26 @@ class WordleApp(tk.Tk):
                     self.add_log(f"present_letters: {sorted(list(present_letters))}")
                     self.add_log(f"excluded_letters: {sorted(list(excluded_letters))}")
 
-                    solver = WordleSolver(words)
                     unknowns = [(i, item["letter"]) for i, item in enumerate(results) if item["state"] == "present"]
-                    candidates = solver.filter_candidates(known_pattern, unknowns, list(excluded_letters))
-                    self.add_log(f"Candidates after Row 1: {len(candidates)}")
 
-                    if candidates:
-                        next_best = analyzer.suggest_best_words(word_list=candidates, top_n=1)[0][0]
-                        self.add_log(f"Next best guess (for Row 2): {next_best}")
+                    current_candidates = solver.filter_candidates(known_pattern, unknowns, list(excluded_letters))
+                    self.add_log(f"Candidates left: {len(current_candidates)}")
 
-                except Exception as e:
-                    self.add_log(f"Error reading Row 1: {e}")
+                    if not current_candidates:
+                        self.add_log("No candidates left. Stopping.")
+                        break
+
+                else:
+                    self.add_log("❌ All 6 attempts used. No solution found.")
+
+            except Exception as ex_first:
+                self.add_log(f"Error during solving loop: {ex_first}")
 
                 # time.sleep(3)  # صبر برای تغییر وضعیت
                 # page_html = self.driver.page_source
                 # with open("debug_page.html", "w", encoding="utf-8") as f:
                 #     f.write(page_html)
                 # self.add_log("Saved debug_page.html for inspection.")
-
-            except Exception as ex_first:
-                self.add_log(f"Error during first-guess sequence: {ex_first}")
 
         except Exception as ex:
             self.add_log(f"Error in run_solver: {ex}")
