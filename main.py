@@ -322,6 +322,7 @@ class WordleApp(tk.Tk):
                     if all(item["state"] == "correct" for item in results):
                         self.add_log(f"🎉 Solved! The word is '{guess}'.")
                         solved = True
+                        self.last_solution = guess
 
                         try:
                             # صبر می‌کنیم تا #loginPrompt-dialog ظاهر بشه (حداکثر 10 ثانیه)
