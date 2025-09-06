@@ -322,6 +322,36 @@ class WordleApp(tk.Tk):
                     if all(item["state"] == "correct" for item in results):
                         self.add_log(f"🎉 Solved! The word is '{guess}'.")
                         solved = True
+                        # try to close the stats modal (exit button)
+                        try:
+                            close_stats = WebDriverWait(self.driver, 5).until(
+                                EC.element_to_be_clickable(
+                                    (
+                                        By.CSS_SELECTOR,
+                                        "#loginPrompt-dialog button.Modal-module_closeIconButton__y9b6c, #loginPrompt-dialog div[class^='Modal-module_fullscreenStatsExit__'] > div > button",
+                                    )
+                                )
+                            )
+                            close_stats.click()
+                            self.add_log("Clicked final 'Close' button (stats modal).")
+                        except Exception as ex:
+                            self.add_log(f"Stats modal close button not found or not clickable: {ex}")
+
+                        # --- Close second stats modal (regiwall) ---
+                        try:
+                            close_regiwall = WebDriverWait(self.driver, 5).until(
+                                EC.element_to_be_clickable(
+                                    (
+                                        By.CSS_SELECTOR,
+                                        "#regiwall-dialog div[class^='Modal-module_fullscreenStatsExit__'] > div > button",
+                                    )
+                                )
+                            )
+                            close_regiwall.click()
+                            self.add_log("Clicked second 'Close' button (regiwall modal).")
+                        except Exception as ex:
+                            self.add_log(f"Regiwall modal close button not found or not clickable: {ex}")
+
                         break
 
                     # update knowledge: known_pattern, present_letters, excluded_letters, unknowns (accumulate)
