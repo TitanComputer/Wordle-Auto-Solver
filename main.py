@@ -15,6 +15,9 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.common.exceptions import WebDriverException, JavascriptException
 
+import webbrowser
+from idlelib.tooltip import Hovertip  # برای تولتیپ ساده
+
 APP_VERSION = "1.0.0"
 
 
@@ -457,7 +460,80 @@ class WordleApp(tk.Tk):
         messagebox.showinfo("Translation", f"{self.last_solution} → {translation or 'not available'}")
 
     def open_donate_page(self):
-        messagebox.showinfo("Donate", "Donate page (to be implemented)")
+        """
+        Opens a donation window with options to support the project.
+        """
+
+        top = tk.Toplevel(self)
+        top.title("Donate ❤")
+        top.resizable(False, False)
+
+        # Center the window
+        top.withdraw()
+        top.iconphoto(False, self.icon)  # اگر آیکون داری
+        top.update_idletasks()
+        width, height = 550, 300
+        x = (top.winfo_screenwidth() // 2) - (width // 2)
+        y = (top.winfo_screenheight() // 2) - (height // 2)
+        top.geometry(f"{width}x{height}+{x}+{y}")
+        top.deiconify()
+
+        top.grab_set()
+        top.transient(self)
+
+        # ==== Layout starts ====
+
+        # Donate image (clickable)
+        donate_img = tk.PhotoImage(file=self.resource_path(os.path.join("assets", "donate.png")))
+        donate_button = ttk.Label(top, image=donate_img, cursor="hand2")
+        donate_button.grid(row=0, column=0, columnspan=2, pady=(30, 20))
+        donate_button.image = donate_img
+
+        def open_link(event):
+            webbrowser.open_new("http://www.coffeete.ir/Titan")
+
+        donate_button.bind("<Button-1>", open_link)
+
+        # USDT Label
+        usdt_label = ttk.Label(top, text="USDT (Tether) – TRC20 Wallet Address :", font=("Segoe UI", 10, "bold"))
+        usdt_label.grid(row=1, column=0, columnspan=2, pady=(30, 5), sticky="w", padx=20)
+
+        # Entry field (readonly)
+        wallet_address = "TGoKk5zD3BMSGbmzHnD19m9YLpH5ZP8nQe"
+        wallet_entry = ttk.Entry(top, width=40)
+        wallet_entry.insert(0, wallet_address)
+        wallet_entry.configure(state="readonly")
+        wallet_entry.grid(row=2, column=0, padx=(20, 10), pady=5, sticky="ew")
+
+        # Copy button
+        copy_btn = ttk.Button(top, text="Copy")
+        copy_btn.grid(row=2, column=1, padx=(0, 20), pady=5, sticky="w")
+
+        tooltip = None
+
+        def copy_wallet():
+            nonlocal tooltip
+            self.clipboard_clear()
+            self.clipboard_append(wallet_address)
+            self.update()
+
+            if tooltip:
+                tooltip.hidetip()
+                tooltip = None
+
+            tooltip = Hovertip(copy_btn, "Copied to clipboard!")
+            tooltip.showtip()
+
+            def hide_tip():
+                if tooltip:
+                    tooltip.hidetip()
+
+            top.after(2000, hide_tip)
+
+        copy_btn.configure(command=copy_wallet)
+
+        # Make the first column expand
+        top.grid_columnconfigure(0, weight=1)
 
 
 if __name__ == "__main__":
