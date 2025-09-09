@@ -162,11 +162,21 @@ class WordleApp(tk.Tk):
             service = Service(chrome_path)
             options = webdriver.ChromeOptions()
             # keep browser visible (do not use headless)
+            screen_width = self.winfo_screenwidth()
+            screen_height = self.winfo_screenheight()
+
+            # یک سوم عرض نمایشگر
+            target_width = int(screen_width / 3)
+            target_height = int(screen_height)  # یا هر مقداری خواستی، مثلا نصف
+
             options.add_argument("--disable-gpu")
             options.add_argument("--no-sandbox")
             options.add_argument("--disable-dev-shm-usage")
+            options.add_argument(f"--window-size={target_width},{target_height}")
+            options.add_argument("--window-position=0,0")
 
             self.driver = webdriver.Chrome(service=service, options=options)
+
             self.add_log("Chrome started.")
             self.driver.get("https://www.nytimes.com/games/wordle/index.html")
 
