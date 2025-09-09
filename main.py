@@ -58,7 +58,9 @@ class WordleApp(tk.Tk):
         self.log_box.pack(pady=5, padx=10, fill=tk.BOTH, expand=True)
 
         # Translate button
-        self.translate_button = ttk.Button(self, text="Translate to Persian", command=self.translate_word)
+        self.translate_button = ttk.Button(
+            self, text="Translate to Persian", command=self.translate_word, state=tk.DISABLED
+        )
         self.translate_button.pack(pady=5, fill=tk.X, padx=10)
 
         # Donate button with image
@@ -130,6 +132,7 @@ class WordleApp(tk.Tk):
         if not self.running:
             self.running = True
             self.start_button.config(text="Stop")
+            self.translate_button.configure(state=tk.DISABLED)
             self.log_box.config(state=tk.NORMAL)
             self.log_box.delete("1.0", tk.END)
             self.log_box.config(state=tk.DISABLED)
@@ -322,6 +325,7 @@ class WordleApp(tk.Tk):
                     if all(item["state"] == "correct" for item in results):
                         self.add_log(f"🎉 Solved! The word is '{guess}'.")
                         solved = True
+                        self.translate_button.configure(state=tk.NORMAL)
                         self.last_solution = guess
 
                         try:
