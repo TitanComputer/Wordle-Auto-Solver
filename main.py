@@ -100,7 +100,19 @@ class WordleApp(tk.Tk):
                 self.add_log("Chrome window was closed unexpectedly.")
                 self.running = False
                 self.start_button.config(text="Start")
+                try:
+                    self.driver.quit()
+                except:
+                    pass
                 self.driver = None
+
+    def start_driver_watcher(self):
+        def loop():
+            self.check_driver()
+            if self.running:  # فقط وقتی که در حال اجراست ادامه بده
+                self.after(2000, loop)  # هر ۲ ثانیه
+
+        loop()
 
     def resource_path(self, relative_path):
         temp_dir = os.path.dirname(__file__)
@@ -179,6 +191,7 @@ class WordleApp(tk.Tk):
             options.add_argument("--window-position=0,0")
 
             self.driver = webdriver.Chrome(service=service, options=options)
+            self.start_driver_watcher()
 
             self.add_log("Chrome started.")
             self.driver.get("https://www.nytimes.com/games/wordle/index.html")
@@ -442,6 +455,9 @@ class WordleApp(tk.Tk):
             self.driver = None
             self.running = False
             self.start_button.config(text="Start")
+        finally:
+            self.check_driver()
+
         # do NOT quit the driver here on success — leave it open so Stop button can close it later
 
     def translate_word(self):
