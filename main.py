@@ -13,10 +13,9 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
-from selenium.common.exceptions import WebDriverException, JavascriptException
 
 import webbrowser
-from idlelib.tooltip import Hovertip  # برای تولتیپ ساده
+from idlelib.tooltip import Hovertip
 
 APP_VERSION = "1.0.0"
 
@@ -82,6 +81,7 @@ class WordleApp(tk.Tk):
         self.donate_button.pack(fill=tk.X, padx=10)
 
     def on_close(self):
+        """Stops the solver, closes the Chrome window, and exits the app."""
         if self.driver:
             try:
                 self.driver.quit()
@@ -93,6 +93,9 @@ class WordleApp(tk.Tk):
         self.destroy()
 
     def check_driver(self):
+        """Periodically checks if the Chrome window is still open. If it was closed,
+        stops the solver and resets the UI."""
+
         if self.driver:
             try:
                 self.driver.title
@@ -107,18 +110,25 @@ class WordleApp(tk.Tk):
                 self.driver = None
 
     def start_driver_watcher(self):
+        """Periodically checks if the Chrome window is still open. If it was closed,
+        stops the solver and resets the UI."""
+
         def loop():
             self.check_driver()
-            if self.running:  # فقط وقتی که در حال اجراست ادامه بده
-                self.after(2000, loop)  # هر ۲ ثانیه
+            if self.running:
+                self.after(2000, loop)
 
         loop()
 
     def resource_path(self, relative_path):
+        """Returns the absolute path to a file in the same directory as the script.
+        This is used to find resources like images when the script is run from a
+        different directory (e.g. as an executable)."""
         temp_dir = os.path.dirname(__file__)
         return os.path.join(temp_dir, relative_path)
 
     def center_window(self):
+        """Centers the window on the screen."""
         self.update_idletasks()  # make sure geometry info is updated
         width = self.winfo_width()
         height = self.winfo_height()
@@ -137,6 +147,7 @@ class WordleApp(tk.Tk):
     #         self.add_log(f"Failed to apply theme: {selected}")
 
     def add_log(self, message):
+        """Adds a new log message to the log box with a timestamp."""
         timestamp = time.strftime("%H:%M:%S")
         self.log_box.config(state=tk.NORMAL)
         self.log_box.insert(tk.END, f"[{timestamp}] {message}\n")
@@ -144,6 +155,9 @@ class WordleApp(tk.Tk):
         self.log_box.config(state=tk.DISABLED)
 
     def toggle_solver(self):
+        """Toggle the solver on or off. If it was off, start the solver and
+        disable the translate button. If it was on, stop the solver and
+        re-enable the translate button."""
         if not self.running:
             self.running = True
             self.start_button.config(text="Stop")
@@ -164,6 +178,16 @@ class WordleApp(tk.Tk):
             self.start_button.config(text="Start")
 
     def run_solver(self):
+        """
+        Starts the Chrome driver, loads the Wordle game page, and begins the solving loop.
+
+        This function is called when the Start button is clicked. The solving loop will attempt to
+        solve the game by guessing words and analyzing the results. The loop will continue until the
+        game is solved or the maximum number of attempts is reached.
+
+        The function is also responsible for displaying the game page and handling any errors that
+        occur during the solving loop.
+        """
         base_dir = os.path.dirname(os.path.abspath(__file__))
         chrome_path = os.path.join(base_dir, "assets", "chromedriver.exe")
 
@@ -180,9 +204,9 @@ class WordleApp(tk.Tk):
             screen_width = self.winfo_screenwidth()
             screen_height = self.winfo_screenheight()
 
-            # یک سوم عرض نمایشگر
+            # set window size
             target_width = int(screen_width / 3)
-            target_height = int(screen_height)  # یا هر مقداری خواستی، مثلا نصف
+            target_height = int(screen_height)
 
             options.add_argument("--disable-gpu")
             options.add_argument("--no-sandbox")
@@ -355,7 +379,7 @@ class WordleApp(tk.Tk):
                         self.last_solution = guess
 
                         try:
-                            # صبر می‌کنیم تا #loginPrompt-dialog ظاهر بشه (حداکثر 10 ثانیه)
+                            # wait for #loginPrompt-dialog to appear
                             WebDriverWait(self.driver, 10).until(
                                 EC.presence_of_element_located((By.ID, "loginPrompt-dialog"))
                             )
@@ -438,7 +462,7 @@ class WordleApp(tk.Tk):
             except Exception as ex_first:
                 self.add_log(f"Error during solving loop: {ex_first}")
 
-                # time.sleep(3)  # صبر برای تغییر وضعیت
+                # time.sleep(3)
                 # page_html = self.driver.page_source
                 # with open("debug_page.html", "w", encoding="utf-8") as f:
                 #     f.write(page_html)
@@ -461,6 +485,12 @@ class WordleApp(tk.Tk):
         # do NOT quit the driver here on success — leave it open so Stop button can close it later
 
     def translate_word(self):
+        """Shows a translation of the last solved word from English to Farsi (Persian).
+        If no solution is available yet, shows a message box with an appropriate message.
+        Uses the free MyMemory Translation API (https://mymemory.translated.net/doc/).
+        The translation is attempted in a separate request and will be None if the request
+        fails or times out (6 seconds).
+        """
         if not self.last_solution:
             messagebox.showinfo("Translation", "No solution available yet.")
             return
@@ -486,13 +516,12 @@ class WordleApp(tk.Tk):
 
         # Center the window
         top.withdraw()
-        top.iconphoto(False, self.icon)  # اگر آیکون داری
+        top.iconphoto(False, self.icon)
         top.update_idletasks()
         width, height = 550, 300
         x = (top.winfo_screenwidth() // 2) - (width // 2)
         y = (top.winfo_screenheight() // 2) - (height // 2)
         top.geometry(f"{width}x{height}+{x}+{y}")
-        top.deiconify()
 
         top.grab_set()
         top.transient(self)
@@ -504,8 +533,13 @@ class WordleApp(tk.Tk):
         donate_button = ttk.Label(top, image=donate_img, cursor="hand2")
         donate_button.grid(row=0, column=0, columnspan=2, pady=(30, 20))
         donate_button.image = donate_img
+        top.deiconify()
 
         def open_link(event):
+            """
+            Opens the donation link in a web browser when the donate button is clicked.
+            The link is: http://www.coffeete.ir/Titan
+            """
             webbrowser.open_new("http://www.coffeete.ir/Titan")
 
         donate_button.bind("<Button-1>", open_link)
@@ -528,6 +562,11 @@ class WordleApp(tk.Tk):
         tooltip = None
 
         def copy_wallet():
+            """
+            Copies the wallet address to the clipboard and shows a tooltip notification.
+            The notification is automatically hidden after 2 seconds using the `after` method.
+            """
+
             nonlocal tooltip
             self.clipboard_clear()
             self.clipboard_append(wallet_address)
@@ -541,6 +580,10 @@ class WordleApp(tk.Tk):
             tooltip.showtip()
 
             def hide_tip():
+                """
+                Hides the tooltip notification created by `copy_wallet`.
+                """
+
                 if tooltip:
                     tooltip.hidetip()
 
