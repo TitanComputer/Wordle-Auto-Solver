@@ -66,7 +66,7 @@ class WordleApp(tk.Tk):
         self.translate_button.pack(pady=5, fill=tk.X, padx=10)
 
         # Donate button with image
-        heart_path = os.path.join("assets", "heart.png")
+        heart_path = self.resource_path(os.path.join("assets", "heart.png"))
         if os.path.exists(heart_path):
             heart_img = Image.open(heart_path).resize((20, 20))
             self.heart_photo = ImageTk.PhotoImage(heart_img)
@@ -188,8 +188,7 @@ class WordleApp(tk.Tk):
         The function is also responsible for displaying the game page and handling any errors that
         occur during the solving loop.
         """
-        base_dir = os.path.dirname(os.path.abspath(__file__))
-        chrome_path = os.path.join(base_dir, "assets", "chromedriver.exe")
+        chrome_path = self.resource_path(os.path.join("assets", "chromedriver.exe"))
 
         if not os.path.exists(chrome_path):
             self.add_log(f"Chromedriver not found at: {chrome_path}")
@@ -208,6 +207,7 @@ class WordleApp(tk.Tk):
             target_width = int(screen_width / 3)
             target_height = int(screen_height)
 
+            # options.add_argument("--headless=new") # run headless
             options.add_argument("--disable-gpu")
             options.add_argument("--no-sandbox")
             options.add_argument("--disable-dev-shm-usage")
@@ -291,7 +291,7 @@ class WordleApp(tk.Tk):
 
             # === prepare analyzer and words ===
             try:
-                words_file = os.path.join(base_dir, "assets", "words_sorted.txt")
+                words_file = self.resource_path(os.path.join("assets", "words_sorted.txt"))
                 with open(words_file, "r", encoding="utf-8") as f:
                     words = [w.strip() for w in f if w.strip()]
 
@@ -410,7 +410,7 @@ class WordleApp(tk.Tk):
                         break
 
                     # update knowledge: known_pattern, present_letters, excluded_letters, unknowns (accumulate)
-                    row_present = {item["letter"] for item in results if item["state"] == "present"}
+                    # row_present = {item["letter"] for item in results if item["state"] == "present"}  # check this late TODO
 
                     for idx, item in enumerate(results):
                         l = item["letter"]
