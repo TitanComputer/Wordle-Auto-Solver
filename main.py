@@ -30,7 +30,6 @@ class WordleApp(tk.Tk):
         self.withdraw()
         self.iconphoto(False, self.icon)
         self.center_window()
-        self.deiconify()
         self.resizable(False, False)
         self.protocol("WM_DELETE_WINDOW", self.on_close)
 
@@ -79,6 +78,7 @@ class WordleApp(tk.Tk):
             donate_frame, text="Donate", command=self.open_donate_page, image=self.heart_photo, compound="right"
         )
         self.donate_button.pack(fill=tk.X, padx=10)
+        self.deiconify()
 
     def on_close(self):
         """Stops the solver, closes the Chrome window, and exits the app."""
