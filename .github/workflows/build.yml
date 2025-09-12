@@ -21,6 +21,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Download chromedriver
+        run: |
+          Invoke-WebRequest -Uri https://storage.googleapis.com/chrome-for-testing-public/140.0.7339.82/win64/chromedriver-win64.zip -OutFile chromedriver.zip
+          Expand-Archive chromedriver.zip -DestinationPath assets
+          Move-Item -Path assets\chromedriver-win64\chromedriver.exe -Destination assets\chromedriver.exe -Force
+          Remove-Item -Recurse -Force assets\chromedriver-win64
+
+
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
@@ -54,7 +62,7 @@ jobs:
         shell: bash
         run: |
           python -m nuitka \
-            --jobs=16 \
+            --jobs=4 \
             --enable-plugin=upx \
             --upx-binary="$UPX_BIN" \
             --enable-plugin=multiprocessing \
