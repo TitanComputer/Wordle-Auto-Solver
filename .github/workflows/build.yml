@@ -28,6 +28,9 @@ jobs:
           Move-Item -Path assets\chromedriver-win64\chromedriver.exe -Destination assets\chromedriver.exe -Force
           Remove-Item -Recurse -Force assets\chromedriver-win64
 
+      - name: Check files
+        run: dir assets
+
 
       - name: Setup Python
         uses: actions/setup-python@v5
