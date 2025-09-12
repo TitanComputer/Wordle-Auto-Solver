@@ -54,6 +54,7 @@ jobs:
         shell: bash
         run: |
           python -m nuitka \
+            --jobs=16 \
             --enable-plugin=upx \
             --upx-binary="$UPX_BIN" \
             --enable-plugin=multiprocessing \
