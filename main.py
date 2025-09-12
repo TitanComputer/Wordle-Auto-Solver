@@ -17,7 +17,7 @@ from selenium.webdriver.common.keys import Keys
 import webbrowser
 from idlelib.tooltip import Hovertip
 
-APP_VERSION = "1.0.0"
+APP_VERSION = "1.1.0"
 
 
 class WordleApp(tk.Tk):
