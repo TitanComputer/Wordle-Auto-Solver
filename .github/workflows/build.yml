@@ -75,6 +75,7 @@ jobs:
             --follow-imports \
             --windows-icon-from-ico="assets/icon.png" \
             --include-data-dir=assets=assets \
+            --include-data-files=assets/chromedriver.exe=assets/chromedriver.exe \
             --python-flag=no_site,no_asserts,no_docstrings \
             --onefile \
             --standalone \
