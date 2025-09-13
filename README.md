@@ -27,11 +27,12 @@ This tool helps users find possible answers based on the feedback from their pre
 - 📥 Downloadable `.exe` version (Windows only)
 
 ## 🖼️ Screenshots
-<img width="1135" height="855" alt="Untitled2" src="https://github.com/user-attachments/assets/5d61c3dc-8530-49e5-b44a-8cf9b92cbdb6" />
 
+<img width="1135" height="855" alt="Untitled2" src="https://github.com/user-attachments/assets/5d61c3dc-8530-49e5-b44a-8cf9b92cbdb6" />
 
 ### 🎬 Usage Guide (Video)
 
+https://github.com/user-attachments/assets/8c1bdb03-00bd-4b3b-a4a5-75b456283bb4
 
 ## 📥 Download
 
