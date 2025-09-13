@@ -43,30 +43,19 @@ If you're using the Python script:
 ```bash
 python main.py
 ```
-Or, run the Wordle-Solver.exe file directly if you downloaded the compiled version.
+Or, run the Wordle-Auto-Solver.exe file directly if you downloaded the compiled version.
 
 ### 🖥️ How to Use the GUI
 
-When you open the program:
-
-1. **Enter known letters in the Known Positions row**  
-   These are letters in the correct position (🟩). If you know a letter must be at a certain spot, type it in that position. Leave unknown spots empty.
-
-2. **Enter misplaced letters in the Unknown Positions rows**  
-   These are letters that are in the word, but not in the correct position (🟨). You can type multiple letters per box, separated by spaces, if needed.
-
-3. **Enter excluded letters in the Not Included rows**  
-   These are letters that are definitely **not** in the word (⬛️). Type all such letters in the input box.
-
-4. **Click the "Submit Query" button**  
-   The program will scan the dictionary and show only the words that match your clues.
-
-5. **Review the results**  
-   A list of possible words will be displayed. You can use this to help choose your next guess in Wordle.
-
-6. **Use the "Reset" button** if you want to start over.
-
-7. **Optional: Toggle Dark Mode** using the Dark Mode toggle to change the application's theme.
+1. Launch the app (`python main.py` or `Wordle-Auto-Solver.exe`) then click "Start".  
+2. Chrome opens on the left side and loads [Wordle](https://www.nytimes.com/games/wordle/index.html).  
+3. The solver automatically:  
+   - Closes popups/ads  
+   - Enters the best first guess  
+   - Reads feedback and refines candidates  
+   - Repeats until solved or 6 tries are used  
+4. The log shows progress, the solution 🎉, or failure after 6 attempts.  
+5. Press **Stop** anytime to end the solver.  
 
 ---
 
@@ -137,6 +126,10 @@ You can build the standalone executable using the following command:
 ```bash
 .\venv\Scripts\python.exe -m nuitka --jobs=4 --enable-plugin=upx --upx-binary="YOUR PATH\upx.exe" --enable-plugin=multiprocessing --lto=yes --enable-plugin=tk-inter --windows-console-mode=disable --follow-imports --windows-icon-from-ico="assets/icon.png" --include-data-dir=assets=assets --include-data-files=assets/chromedriver.exe=assets/chromedriver.exe --python-flag=no_site,no_asserts,no_docstrings --onefile --standalone --msvc=latest --output-filename=Wordle-Auto-Solver main.py
 ```
+
+## 🚀 CI/CD
+
+The GitHub Actions workflow builds the binary on every release and attaches it as an artifact.
 
 ## 🤝 Contributing
 Pull requests are welcome.
