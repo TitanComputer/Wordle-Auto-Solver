@@ -32,7 +32,7 @@ This tool helps users find possible answers based on the feedback from their pre
 
 ### 🎬 Usage Guide (Video)
 
-https://github.com/user-attachments/assets/8c1bdb03-00bd-4b3b-a4a5-75b456283bb4
+https://github.com/user-attachments/assets/a1b57cae-47f2-4a23-b7a0-f9c27a4b7ebe
 
 ## 📥 Download
 
