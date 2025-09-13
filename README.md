@@ -24,7 +24,7 @@ This tool helps users find possible answers based on the feedback from their pre
 - 📊 Letter frequency analysis to select the most probable guess
 - 🔄 Iterates guesses until the solution is found or all six attempts are used
 - 🤖 Auto-handles popups, ads, and dialogs during the game
-- Downloadable `.exe` version (Windows only)
+- 📥 Downloadable `.exe` version (Windows only)
 
 ## 🖼️ Screenshots
 
@@ -58,29 +58,6 @@ Or, run the Wordle-Auto-Solver.exe file directly if you downloaded the compiled 
 5. Press **Stop** anytime to end the solver.  
 
 ---
-
-### 📌 Example
-
-If Wordle gave you the following hint:
-
-- Correct letter at position 2 is `A`
-- `R` is somewhere in the word, but not in position 3
-- Letters `S`, `E`, and `T` are not in the word
-
-You would:
-- Type `A` into the second box in the green row
-- Type `R` into the yellow row (not in box 3)
-- Type `S E T` into the gray box
-- Click "Submit Query" to get valid words like: `HAIRY`, `LABOR`, etc.
-
----
-
-### 💡 Notes
-
-- All guesses must be exactly 5 letters
-- The dictionary is case-insensitive and cleansed of invalid words
-- You can update `words.txt` in the `dict/` folder to customize the wordlist by clicking on the "Get Dictionary" button
-
 
 ## 📦 Dependencies
 
