@@ -84,11 +84,14 @@ class WordleApp(tk.Tk):
         """Stops the solver, closes the Chrome window, and exits the app."""
         if self.driver:
             try:
-                self.driver.quit()
+                self.driver.execute_script("window.stop();")  # اگر صفحه در حال load است، متوقف شود
+            except Exception:
+                pass
+            try:
+                self.driver.quit()  # کروم بسته شود
             except Exception:
                 pass
             self.driver = None
-
         self.running = False
         self.destroy()
 
@@ -167,14 +170,21 @@ class WordleApp(tk.Tk):
             self.log_box.config(state=tk.DISABLED)
             self.thread = threading.Thread(target=self.run_solver, daemon=True)
             self.thread.start()
-        else:
+        else:  # یعنی Stop زده شده
             self.add_log("Stop requested by user.")
             self.running = False
+
             if self.driver:
                 try:
-                    self.driver.quit()
+                    self.driver.execute_script("window.stop();")  # فوراً لود را متوقف کن
                 except Exception:
                     pass
+                try:
+                    self.driver.quit()  # فوراً کروم را ببند
+                except Exception:
+                    pass
+                self.driver = None
+
             self.start_button.config(text="Start")
 
     def run_solver(self):
@@ -217,7 +227,7 @@ class WordleApp(tk.Tk):
             self.driver = webdriver.Chrome(service=service, options=options)
             self.start_driver_watcher()
 
-            self.driver.set_page_load_timeout(10)  # 10 ثانیه زمان برای get
+            self.driver.set_page_load_timeout(10)
             try:
                 self.driver.get("https://www.nytimes.com/games/wordle/index.html")
                 self.add_log("Chrome started and page requested.")
@@ -427,7 +437,7 @@ class WordleApp(tk.Tk):
                 # end of attempts
                 if not solved:
                     try:
-                        # تلاش برای گرفتن متن کلمه روز از toast
+                        # wait for toast
                         toast_elem = WebDriverWait(self.driver, 5).until(
                             EC.presence_of_element_located((By.CSS_SELECTOR, "div.Toast-module_toast__iiVsN"))
                         )
