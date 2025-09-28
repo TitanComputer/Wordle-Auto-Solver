@@ -217,17 +217,17 @@ class WordleApp(tk.Tk):
             self.driver = webdriver.Chrome(service=service, options=options)
             self.start_driver_watcher()
 
-            self.add_log("Chrome started.")
-            self.driver.get("https://www.nytimes.com/games/wordle/index.html")
-
-            wait = WebDriverWait(self.driver, 25)
-
-            # wait until document.readyState == 'complete'
+            self.driver.set_page_load_timeout(10)  # 10 ثانیه زمان برای get
             try:
-                wait.until(lambda d: d.execute_script("return document.readyState") == "complete")
-                self.add_log("Page load complete.")
+                self.driver.get("https://www.nytimes.com/games/wordle/index.html")
+                self.add_log("Chrome started and page requested.")
             except Exception as e:
-                self.add_log(f"Timeout waiting for full page load: {e}")
+                self.add_log(f"Page load took too long or failed: {e}")
+                try:
+                    self.driver.execute_script("window.stop();")
+                    self.add_log("Forced stop sent to browser.")
+                except Exception as e2:
+                    self.add_log(f"Failed to force stop: {e2}")
 
             # if user pressed Stop meanwhile, stop
             if not self.running:
@@ -236,7 +236,7 @@ class WordleApp(tk.Tk):
 
             # 1) Click "Accept all" (cookie consent) if present
             try:
-                accept_btn = WebDriverWait(self.driver, 15).until(
+                accept_btn = WebDriverWait(self.driver, 5).until(
                     EC.element_to_be_clickable(
                         (
                             By.CSS_SELECTOR,
