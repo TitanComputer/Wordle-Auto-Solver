@@ -377,36 +377,6 @@ class WordleApp(tk.Tk):
                         solved = True
                         self.translate_button.configure(state=tk.NORMAL)
                         self.last_solution = guess
-
-                        try:
-                            # wait for #loginPrompt-dialog to appear
-                            WebDriverWait(self.driver, 10).until(
-                                EC.presence_of_element_located((By.ID, "loginPrompt-dialog"))
-                            )
-                            self.driver.execute_script(
-                                """
-                                let el = document.querySelector("#loginPrompt-dialog");
-                                if (el) { el.remove(); }
-                            """
-                            )
-                            self.add_log("Removed #loginPrompt-dialog from DOM.")
-                        except Exception as ex:
-                            self.add_log(f"#loginPrompt-dialog not found or could not be removed: {ex}")
-
-                        try:
-                            WebDriverWait(self.driver, 10).until(
-                                EC.presence_of_element_located((By.CSS_SELECTOR, "[id^='lire-ui-']"))
-                            )
-                            self.driver.execute_script(
-                                """
-                                document.querySelectorAll("[id^='lire-ui-']").forEach(el => el.remove());
-                            """
-                            )
-                            self.add_log("Removed all elements with id starting with 'lire-ui-'.")
-                        except Exception as ex:
-                            self.add_log(
-                                f"No elements with id starting with 'lire-ui-' found or could not be removed: {ex}"
-                            )
                         break
 
                     # update knowledge: known_pattern, present_letters, excluded_letters, unknowns (accumulate)
@@ -457,6 +427,32 @@ class WordleApp(tk.Tk):
                 # end of attempts
                 if not solved and current_candidates:
                     self.add_log("Solver finished (did not find solution within attempts).")
+
+                try:
+                    # wait for #loginPrompt-dialog to appear
+                    WebDriverWait(self.driver, 10).until(EC.presence_of_element_located((By.ID, "loginPrompt-dialog")))
+                    self.driver.execute_script(
+                        """
+                        let el = document.querySelector("#loginPrompt-dialog");
+                        if (el) { el.remove(); }
+                    """
+                    )
+                    self.add_log("Removed #loginPrompt-dialog from DOM.")
+                except Exception as ex:
+                    self.add_log(f"#loginPrompt-dialog not found or could not be removed: {ex}")
+
+                try:
+                    WebDriverWait(self.driver, 10).until(
+                        EC.presence_of_element_located((By.CSS_SELECTOR, "[id^='lire-ui-']"))
+                    )
+                    self.driver.execute_script(
+                        """
+                        document.querySelectorAll("[id^='lire-ui-']").forEach(el => el.remove());
+                    """
+                    )
+                    self.add_log("Removed all elements with id starting with 'lire-ui-'.")
+                except Exception as ex:
+                    self.add_log(f"No elements with id starting with 'lire-ui-' found or could not be removed: {ex}")
                 # --- end of replacement loop ---
 
             except Exception as ex_first:
