@@ -59,6 +59,14 @@ class WordleApp(tk.Tk):
         self.log_box = tk.Text(self, height=10, width=40, state=tk.DISABLED)
         self.log_box.pack(pady=5, padx=10, fill=tk.BOTH, expand=True)
 
+        # Context menu for log box
+        self.log_menu = tk.Menu(self.log_box, tearoff=0)
+        self.log_menu.add_command(label="Copy Selected", command=self.copy_selected_log)
+        self.log_menu.add_command(label="Select All & Copy", command=self.select_all_copy_log)
+
+        # Bind right-click to show menu
+        self.log_box.bind("<Button-3>", self.show_log_menu)
+
         # Translate button
         self.translate_button = ttk.Button(
             self, text="Translate to Persian", command=self.translate_word, state=tk.DISABLED
@@ -80,6 +88,25 @@ class WordleApp(tk.Tk):
         )
         self.donate_button.pack(fill=tk.X, padx=10)
         self.deiconify()
+
+    def show_log_menu(self, event):
+        """Shows the context menu on right-click."""
+        self.log_menu.tk_popup(event.x_root, event.y_root)
+
+    def copy_selected_log(self):
+        """Copy selected text to clipboard."""
+        try:
+            selected = self.log_box.get(tk.SEL_FIRST, tk.SEL_LAST)
+            self.clipboard_clear()
+            self.clipboard_append(selected)
+            self.update()
+        except tk.TclError:
+            pass
+
+    def select_all_copy_log(self):
+        """Select all text and copy to clipboard."""
+        self.log_box.tag_add(tk.SEL, "1.0", tk.END)
+        self.copy_selected_log()
 
     def on_close(self):
         """Stops the solver, closes the Chrome window, and exits the app."""
