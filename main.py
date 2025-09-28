@@ -27,6 +27,7 @@ class WordleApp(tk.Tk):
         self.title(f"Wordle Auto-Solver v{APP_VERSION}")
         self.geometry("310x400")
         self.icon = PhotoImage(file=self.resource_path(os.path.join("assets", "icon.png")))
+        self.debug = False
         self.withdraw()
         self.iconphoto(False, self.icon)
         self.center_window()
@@ -84,11 +85,11 @@ class WordleApp(tk.Tk):
         """Stops the solver, closes the Chrome window, and exits the app."""
         if self.driver:
             try:
-                self.driver.execute_script("window.stop();")  # اگر صفحه در حال load است، متوقف شود
+                self.driver.execute_script("window.stop();")  # stop loading
             except Exception:
                 pass
             try:
-                self.driver.quit()  # کروم بسته شود
+                self.driver.quit()  # close the Chrome window
             except Exception:
                 pass
             self.driver = None
@@ -149,8 +150,15 @@ class WordleApp(tk.Tk):
     #     except tk.TclError:
     #         self.add_log(f"Failed to apply theme: {selected}")
 
-    def add_log(self, message):
-        """Adds a new log message to the log box with a timestamp."""
+    def add_log(self, message, debug_message=False):
+        """
+        Adds a new log message to the log box with a timestamp.
+
+        If debug_message is True, the message will only be shown if self.debug is True.
+        """
+        if debug_message and not self.debug:
+            return
+
         timestamp = time.strftime("%H:%M:%S")
         self.log_box.config(state=tk.NORMAL)
         self.log_box.insert(tk.END, f"[{timestamp}] {message}\n")
@@ -170,17 +178,17 @@ class WordleApp(tk.Tk):
             self.log_box.config(state=tk.DISABLED)
             self.thread = threading.Thread(target=self.run_solver, daemon=True)
             self.thread.start()
-        else:  # یعنی Stop زده شده
+        else:
             self.add_log("Stop requested by user.")
             self.running = False
 
             if self.driver:
                 try:
-                    self.driver.execute_script("window.stop();")  # فوراً لود را متوقف کن
+                    self.driver.execute_script("window.stop();")
                 except Exception:
                     pass
                 try:
-                    self.driver.quit()  # فوراً کروم را ببند
+                    self.driver.quit()
                 except Exception:
                     pass
                 self.driver = None
@@ -232,12 +240,12 @@ class WordleApp(tk.Tk):
                 self.driver.get("https://www.nytimes.com/games/wordle/index.html")
                 self.add_log("Chrome started and page requested.")
             except Exception as e:
-                self.add_log(f"Page load took too long or failed: {e}")
+                self.add_log(f"Page load took too long or failed: {e}", debug_message=True)
                 try:
                     self.driver.execute_script("window.stop();")
                     self.add_log("Forced stop sent to browser.")
                 except Exception as e2:
-                    self.add_log(f"Failed to force stop: {e2}")
+                    self.add_log(f"Failed to force stop: {e2}", debug_message=True)
 
             # if user pressed Stop meanwhile, stop
             if not self.running:
