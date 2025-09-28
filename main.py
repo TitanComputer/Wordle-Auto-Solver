@@ -17,7 +17,7 @@ from selenium.webdriver.common.keys import Keys
 import webbrowser
 from idlelib.tooltip import Hovertip
 
-APP_VERSION = "1.1.0"
+APP_VERSION = "1.2.0"
 
 
 class WordleApp(tk.Tk):
@@ -425,9 +425,23 @@ class WordleApp(tk.Tk):
                     time.sleep(0.4)
 
                 # end of attempts
-                if not solved and current_candidates:
-                    self.add_log("Solver finished (did not find solution within attempts).")
+                if not solved:
+                    try:
+                        # تلاش برای گرفتن متن کلمه روز از toast
+                        toast_elem = WebDriverWait(self.driver, 5).until(
+                            EC.presence_of_element_located((By.CSS_SELECTOR, "div.Toast-module_toast__iiVsN"))
+                        )
+                        solution_word = (toast_elem.text or "").strip()
+                        if solution_word:
+                            self.last_solution = solution_word.lower()
+                            self.add_log(f"❌ Solver failed. The correct word was: '{solution_word}'")
+                            self.translate_button.configure(state=tk.NORMAL)
+                        else:
+                            self.add_log("Solver finished but no solution word was found in toast.")
+                    except Exception as ex:
+                        self.add_log(f"Solver finished (failed to find solution word). Error: {ex}")
 
+                # --- remove ads and overlays ---
                 try:
                     # wait for #loginPrompt-dialog to appear
                     WebDriverWait(self.driver, 10).until(EC.presence_of_element_located((By.ID, "loginPrompt-dialog")))
