@@ -17,7 +17,7 @@ from selenium.webdriver.common.keys import Keys
 import webbrowser
 from idlelib.tooltip import Hovertip
 
-APP_VERSION = "1.2.0"
+APP_VERSION = "1.3.0"
 
 
 class WordleApp(tk.Tk):
@@ -486,19 +486,73 @@ class WordleApp(tk.Tk):
                     except Exception as ex:
                         self.add_log(f"Solver finished (failed to find solution word). Error: {ex}")
 
-                # --- remove ads and overlays ---
+                # --- click on loginPromptCongrats-dialog ---
                 try:
-                    # wait for #loginPrompt-dialog to appear
-                    WebDriverWait(self.driver, 10).until(EC.presence_of_element_located((By.ID, "loginPrompt-dialog")))
+                    WebDriverWait(self.driver, 20).until(
+                        lambda d: d.execute_script("return document.readyState") == "complete"
+                    )
+
+                    btn1_selector = "#loginPromptCongrats-dialog > div > div > div.Modal-module_fullscreenStatsExit__DpWAs > div > button"
+                    wait = WebDriverWait(self.driver, 15)
+
+                    for attempt in range(3):
+                        try:
+                            btn1 = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, btn1_selector)))
+                            self.driver.execute_script("arguments[0].scrollIntoView(true);", btn1)
+                            self.driver.execute_script("arguments[0].click();", btn1)
+                            self.add_log(
+                                f"[Attempt {attempt+1}] Clicked 'Exit/Continue' button in loginPromptCongrats-dialog."
+                            )
+                            break
+                        except Exception as click_ex:
+                            self.add_log(f"[Attempt {attempt+1}] loginPromptCongrats-dialog not ready yet: {click_ex}")
+                            time.sleep(2)
+                    else:
+                        self.add_log("Failed to click 'Exit/Continue' in loginPromptCongrats-dialog after 3 attempts.")
+
+                except Exception as ex:
+                    self.add_log(f"LoginPromptCongrats-dialog click failed: {ex}")
+
+                # --- wait for next dialog (regiwallCongrats-dialog) ---
+                try:
+                    btn2_selector = "#regiwallCongrats-dialog > div > div > div.Modal-module_fullscreenStatsExit__DpWAs > div > button"
+                    wait = WebDriverWait(self.driver, 20)
+
+                    # Wait for regiwall dialog to appear
+                    wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, btn2_selector)))
+                    self.add_log("regiwallCongrats-dialog detected, waiting for it to be clickable...")
+
+                    for attempt in range(3):
+                        try:
+                            btn2 = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, btn2_selector)))
+                            self.driver.execute_script("arguments[0].scrollIntoView(true);", btn2)
+                            self.driver.execute_script("arguments[0].click();", btn2)
+                            self.add_log(
+                                f"[Attempt {attempt+1}] Clicked 'Exit/Continue' button in regiwallCongrats-dialog."
+                            )
+                            break
+                        except Exception as click_ex:
+                            self.add_log(f"[Attempt {attempt+1}] regiwallCongrats-dialog not ready yet: {click_ex}")
+                            time.sleep(2)
+                    else:
+                        self.add_log("Failed to click 'Exit/Continue' in regiwallCongrats-dialog after 3 attempts.")
+
+                except Exception as ex:
+                    self.add_log(f"RegiwallCongrats-dialog click failed: {ex}")
+
+                # --- clean old loginPrompt-dialog if exists ---
+                try:
+                    wait = WebDriverWait(self.driver, 5)
+                    wait.until(EC.presence_of_element_located((By.ID, "loginPrompt-dialog")))
                     self.driver.execute_script(
                         """
                         let el = document.querySelector("#loginPrompt-dialog");
                         if (el) { el.remove(); }
                     """
                     )
-                    self.add_log("Removed #loginPrompt-dialog from DOM.")
+                    self.add_log("Removed old #loginPrompt-dialog from DOM.")
                 except Exception as ex:
-                    self.add_log(f"#loginPrompt-dialog not found or could not be removed: {ex}")
+                    self.add_log(f"#loginPrompt-dialog not found or already removed: {ex}")
 
                 try:
                     WebDriverWait(self.driver, 10).until(
