@@ -2,10 +2,13 @@ import os
 import threading
 import time
 import requests
+import shutil
 import tkinter as tk
 from tkinter import ttk, messagebox, PhotoImage
 from PIL import Image, ImageTk
 from solver import WordleSolver, LetterFrequencyAnalyzer
+import chromedriver_autoinstaller
+
 
 from selenium import webdriver
 from selenium.webdriver.support.ui import WebDriverWait
@@ -17,7 +20,7 @@ from selenium.webdriver.common.keys import Keys
 import webbrowser
 from idlelib.tooltip import Hovertip
 
-APP_VERSION = "1.3.0"
+APP_VERSION = "1.4.0"
 
 
 class WordleApp(tk.Tk):
@@ -233,16 +236,85 @@ class WordleApp(tk.Tk):
         The function is also responsible for displaying the game page and handling any errors that
         occur during the solving loop.
         """
-        chrome_path = self.resource_path(os.path.join("assets", "chromedriver.exe"))
-
-        if not os.path.exists(chrome_path):
-            self.add_log(f"Chromedriver not found at: {chrome_path}")
-            self.running = False
-            self.start_button.config(text="Start")
-            return
-
         try:
-            service = Service(chrome_path)
+            # === prepare assets/chromedriver.exe path ===
+            local_appdata = os.getenv("LOCALAPPDATA")
+            assets_dir = self.resource_path(os.path.join(local_appdata, "Wordle Auto-Solver"))
+            os.makedirs(assets_dir, exist_ok=True)
+            target_driver_path = self.resource_path(os.path.join(assets_dir, "chromedriver.exe"))
+
+            chromedriver_path = None
+            need_download = False
+
+            if not os.path.exists(target_driver_path):
+                self.add_log("ChromeDriver not found in assets; will download a compatible driver...")
+                need_download = True
+            else:
+                # Quick compatibility check by trying to start a headless test session
+                self.add_log("Found chromedriver in assets — checking compatibility...")
+                opts = webdriver.ChromeOptions()
+                opts.add_argument("--headless=new")
+                opts.add_argument("--no-sandbox")
+                opts.add_argument("--disable-dev-shm-usage")
+                # suppress noisy logging where possible
+                opts.add_experimental_option("excludeSwitches", ["enable-logging"])
+                try:
+                    temp_service = Service(target_driver_path)
+                    temp_driver = webdriver.Chrome(service=temp_service, options=opts)
+                    temp_driver.quit()
+                    chromedriver_path = target_driver_path
+                    self.add_log("Existing ChromeDriver is compatible.")
+                except Exception as ex_check:
+                    self.add_log(f"Existing ChromeDriver incompatible: {ex_check}. Will download replacement.")
+                    need_download = True
+                finally:
+
+                    def safe_quit(driver, timeout=1.5):
+                        t = threading.Thread(target=lambda: driver.quit())
+                        t.daemon = True
+                        t.start()
+
+                    # ensure no zombie session (in rare failure cases)
+                    try:
+                        if "temp_driver" in locals():
+                            safe_quit(temp_driver)
+                    except Exception:
+                        pass
+
+            if need_download:
+                temp_dir = self.resource_path(os.path.join("assets", "temp"))
+                os.makedirs(temp_dir, exist_ok=True)
+                # chromedriver_autoinstaller.install() returns full path to downloaded exe
+                try:
+                    downloaded = chromedriver_autoinstaller.install(path=temp_dir)
+                    self.add_log(f"Downloaded ChromeDriver to: {downloaded}")
+                except Exception as ex_dl:
+                    self.add_log(f"Failed to download ChromeDriver automatically: {ex_dl}")
+                    raise
+
+                # copy to assets/chromedriver.exe (overwrite)
+                try:
+                    shutil.copyfile(downloaded, target_driver_path)
+                    chromedriver_path = target_driver_path
+                    self.add_log(f"Copied ChromeDriver to: {target_driver_path}")
+                except Exception as ex_copy:
+                    # fallback: use downloaded path directly if copy fails
+                    chromedriver_path = downloaded
+                    self.add_log(f"Failed to copy to assets; using downloaded path: {downloaded} (error: {ex_copy})")
+
+                finally:
+                    # remove temp dir
+                    try:
+                        shutil.rmtree(temp_dir)
+                    except Exception:
+                        pass
+
+            # final sanity check
+            if not chromedriver_path or not os.path.exists(chromedriver_path):
+                raise RuntimeError("No usable chromedriver found/installed.")
+
+            # === start real driver using chromedriver_path ===
+            service = Service(chromedriver_path)
             options = webdriver.ChromeOptions()
             # keep browser visible (do not use headless)
             screen_width = self.winfo_screenwidth()
