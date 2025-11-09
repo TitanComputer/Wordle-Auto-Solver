@@ -21,16 +21,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Download chromedriver
-        run: |
-          Invoke-WebRequest -Uri https://storage.googleapis.com/chrome-for-testing-public/140.0.7339.82/win64/chromedriver-win64.zip -OutFile chromedriver.zip
-          Expand-Archive chromedriver.zip -DestinationPath assets
-          Move-Item -Path assets\chromedriver-win64\chromedriver.exe -Destination assets\chromedriver.exe -Force
-          Remove-Item -Recurse -Force assets\chromedriver-win64
-
       - name: Check files
         run: dir assets
-
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -75,7 +67,6 @@ jobs:
             --follow-imports \
             --windows-icon-from-ico="assets/icon.png" \
             --include-data-dir=assets=assets \
-            --include-data-files=assets/chromedriver.exe=assets/chromedriver.exe \
             --python-flag=no_site,no_asserts,no_docstrings \
             --onefile \
             --standalone \
