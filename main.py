@@ -20,7 +20,7 @@ from selenium.webdriver.common.keys import Keys
 import webbrowser
 from idlelib.tooltip import Hovertip
 
-APP_VERSION = "1.4.0"
+APP_VERSION = "1.5.0"
 
 
 class WordleApp(tk.Tk):
@@ -612,19 +612,32 @@ class WordleApp(tk.Tk):
                 except Exception as ex:
                     self.add_log(f"RegiwallCongrats-dialog click failed: {ex}")
 
-                # --- clean old loginPrompt-dialog if exists ---
-                try:
-                    wait = WebDriverWait(self.driver, 5)
-                    wait.until(EC.presence_of_element_located((By.ID, "loginPrompt-dialog")))
-                    self.driver.execute_script(
+                finally:
+                    try:
+                        # Remove the entire dialog element if it exists
+                        self.driver.execute_script(
+                            """
+                            const dlg = document.querySelector('#regiwallCongrats-dialog');
+                            if (dlg) dlg.remove();
                         """
-                        let el = document.querySelector("#loginPrompt-dialog");
-                        if (el) { el.remove(); }
-                    """
-                    )
-                    self.add_log("Removed old #loginPrompt-dialog from DOM.")
-                except Exception as ex:
-                    self.add_log(f"#loginPrompt-dialog not found or already removed: {ex}")
+                        )
+                        self.add_log("regiwallCongrats-dialog element removed from DOM.")
+                    except Exception as cleanup_ex:
+                        self.add_log(f"Failed to remove regiwallCongrats-dialog: {cleanup_ex}")
+
+                # # --- clean old loginPrompt-dialog if exists ---
+                # try:
+                #     wait = WebDriverWait(self.driver, 5)
+                #     wait.until(EC.presence_of_element_located((By.ID, "loginPrompt-dialog")))
+                #     self.driver.execute_script(
+                #         """
+                #         let el = document.querySelector("#loginPrompt-dialog");
+                #         if (el) { el.remove(); }
+                #     """
+                #     )
+                #     self.add_log("Removed old #loginPrompt-dialog from DOM.")
+                # except Exception as ex:
+                #     self.add_log(f"#loginPrompt-dialog not found or already removed: {ex}")
 
                 try:
                     WebDriverWait(self.driver, 10).until(
