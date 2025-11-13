@@ -3,6 +3,7 @@ import threading
 import time
 import requests
 import shutil
+import sys
 import tkinter as tk
 from tkinter import ttk, messagebox, PhotoImage
 from PIL import Image, ImageTk
@@ -20,7 +21,51 @@ from selenium.webdriver.common.keys import Keys
 import webbrowser
 from idlelib.tooltip import Hovertip
 
-APP_VERSION = "1.5.0"
+
+APP_VERSION = "1.6.0"
+
+# --- Single Instance Logic START with Timeout ---
+APP_LOCK_DIR = os.path.join(os.getenv("LOCALAPPDATA", os.getenv("HOME", "/tmp")), "Wordle Auto-Solver")
+LOCK_FILE = os.path.join(APP_LOCK_DIR, "app.lock")
+LOCK_TIMEOUT_SECONDS = 60
+
+os.makedirs(APP_LOCK_DIR, exist_ok=True)
+IS_LOCK_CREATED = False
+
+if os.path.exists(LOCK_FILE):
+    try:
+        lock_age = time.time() - os.path.getmtime(LOCK_FILE)
+
+        if lock_age > LOCK_TIMEOUT_SECONDS:
+            os.remove(LOCK_FILE)
+            print(f"Removed stale lock file (Age: {int(lock_age)}s).")
+        else:
+            try:
+                temp_root = tk.Tk()
+                temp_root.withdraw()
+                messagebox.showerror(
+                    f"Wordle Auto-Solver v{APP_VERSION}",
+                    "Wordle Auto-Solver is already running.\nOnly one instance is allowed.",
+                )
+                temp_root.destroy()
+            except Exception:
+                print("Application is already running.")
+
+            sys.exit(0)
+
+    except Exception as e:
+        print(f"Error checking lock file: {e}. Exiting.")
+        sys.exit(0)
+
+try:
+    with open(LOCK_FILE, "w") as f:
+        f.write(str(os.getpid()))
+    IS_LOCK_CREATED = True
+except Exception as e:
+    print(f"Could not create lock file: {e}")
+    sys.exit(1)
+
+# --- Single Instance Logic END with Timeout ---
 
 
 class WordleApp(tk.Tk):
@@ -90,7 +135,37 @@ class WordleApp(tk.Tk):
             donate_frame, text="Donate", command=self.open_donate_page, image=self.heart_photo, compound="right"
         )
         self.donate_button.pack(fill=tk.X, padx=10)
+
+        # --- Lock Updater Control START ---
+        self.lock_refresh_active = True
+        if "IS_LOCK_CREATED" in globals() and IS_LOCK_CREATED:
+            self.lock_thread = threading.Thread(target=self._lock_updater, daemon=True)
+            self.lock_thread.start()
+            self.add_log("Started lock refresh thread.")
+        # --- Lock Updater Control END ---
+
         self.deiconify()
+
+    def _lock_updater(self):
+        """
+        Periodically updates the lock file timestamp to keep the lock fresh.
+        Runs in a separate thread.
+        """
+        global IS_LOCK_CREATED
+        if not IS_LOCK_CREATED:
+            return
+
+        while self.lock_refresh_active:
+            try:
+                os.utime(LOCK_FILE, None)
+                self.add_log("Lock file timestamp updated.", debug_message=True)
+            except Exception as e:
+                self.add_log(f"Error refreshing lock: {e}", debug_message=True)
+                break
+
+            time.sleep(LOCK_TIMEOUT_SECONDS / 2)
+
+        self.add_log("Lock refresh thread stopped.", debug_message=True)
 
     def show_log_menu(self, event):
         """Shows the context menu on right-click."""
@@ -124,6 +199,15 @@ class WordleApp(tk.Tk):
                 pass
             self.driver = None
         self.running = False
+        # --- Single Instance Cleanup START ---
+        global IS_LOCK_CREATED
+        if "IS_LOCK_CREATED" in globals() and IS_LOCK_CREATED:
+            self.lock_refresh_active = False  # توقف حلقه آپدیت قفل
+            try:
+                os.remove(LOCK_FILE)
+            except Exception as e:
+                self.add_log(f"Warning: Could not remove lock file: {e}")
+        # --- Single Instance Cleanup END ---
         self.destroy()
 
     def check_driver(self):
