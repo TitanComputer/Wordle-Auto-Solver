@@ -1,15 +1,16 @@
+from solver import WordleSolver, LetterFrequencyAnalyzer
 import os
 import threading
 import time
 import requests
 import shutil
 import sys
-import tkinter as tk
+import webbrowser
+from idlelib.tooltip import Hovertip
 from tkinter import ttk, messagebox, PhotoImage
 from PIL import Image, ImageTk
-from solver import WordleSolver, LetterFrequencyAnalyzer
+import tkinter as tk
 import chromedriver_autoinstaller
-
 
 from selenium import webdriver
 from selenium.webdriver.support.ui import WebDriverWait
@@ -18,11 +19,7 @@ from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 
-import webbrowser
-from idlelib.tooltip import Hovertip
-
-
-APP_VERSION = "1.6.0"
+APP_VERSION = "1.7.0"
 
 # --- Single Instance Logic START with Timeout ---
 APP_LOCK_DIR = os.path.join(os.getenv("LOCALAPPDATA", os.getenv("HOME", "/tmp")), "Wordle Auto-Solver")
@@ -43,7 +40,7 @@ if os.path.exists(LOCK_FILE):
             try:
                 temp_root = tk.Tk()
                 temp_root.withdraw()
-                messagebox.showerror(
+                messagebox.showwarning(
                     f"Wordle Auto-Solver v{APP_VERSION}",
                     "Wordle Auto-Solver is already running.\nOnly one instance is allowed.",
                 )
@@ -75,7 +72,7 @@ class WordleApp(tk.Tk):
         self.title(f"Wordle Auto-Solver v{APP_VERSION}")
         self.geometry("310x400")
         self.icon = PhotoImage(file=self.resource_path(os.path.join("assets", "icon.png")))
-        self.debug = False
+        self.donateicon = PhotoImage(file=self.resource_path(os.path.join("assets", "heart.png")))
         self.withdraw()
         self.iconphoto(False, self.icon)
         self.center_window()
@@ -131,17 +128,31 @@ class WordleApp(tk.Tk):
 
         donate_frame = ttk.Frame(self)
         donate_frame.pack(pady=5)
+
+        # Donate button
         self.donate_button = ttk.Button(
             donate_frame, text="Donate", command=self.open_donate_page, image=self.heart_photo, compound="right"
         )
-        self.donate_button.pack(fill=tk.X, padx=10)
+        self.donate_button.pack(side="left", padx=10)
+
+        # Debug Log toggle
+        self.debug = False  # default
+
+        def toggle_debug():
+            self.debug = bool(self.debug_var.get())
+
+        self.debug_var = tk.IntVar(value=0)
+        self.debug_check = ttk.Checkbutton(
+            donate_frame, text="Debug Log", variable=self.debug_var, command=toggle_debug
+        )
+        self.debug_check.pack(side="left", padx=10)
 
         # --- Lock Updater Control START ---
         self.lock_refresh_active = True
         if "IS_LOCK_CREATED" in globals() and IS_LOCK_CREATED:
             self.lock_thread = threading.Thread(target=self._lock_updater, daemon=True)
             self.lock_thread.start()
-            self.add_log("Started lock refresh thread.")
+            self.add_log("Started lock refresh thread.", debug_message=True)
         # --- Lock Updater Control END ---
 
         self.deiconify()
@@ -199,15 +210,17 @@ class WordleApp(tk.Tk):
                 pass
             self.driver = None
         self.running = False
+
         # --- Single Instance Cleanup START ---
         global IS_LOCK_CREATED
         if "IS_LOCK_CREATED" in globals() and IS_LOCK_CREATED:
-            self.lock_refresh_active = False  # توقف حلقه آپدیت قفل
+            self.lock_refresh_active = False
             try:
                 os.remove(LOCK_FILE)
             except Exception as e:
-                self.add_log(f"Warning: Could not remove lock file: {e}")
+                self.add_log(f"Warning: Could not remove lock file: {e}", debug_message=True)
         # --- Single Instance Cleanup END ---
+
         self.destroy()
 
     def check_driver(self):
@@ -218,7 +231,7 @@ class WordleApp(tk.Tk):
             try:
                 self.driver.title
             except Exception:
-                self.add_log("Chrome window was closed unexpectedly.")
+                self.add_log("Chrome window was closed unexpectedly.", debug_message=True)
                 self.running = False
                 self.start_button.config(text="Start")
                 try:
@@ -260,9 +273,9 @@ class WordleApp(tk.Tk):
     #     selected = self.theme_var.get()
     #     try:
     #         self.style.theme_use(selected)
-    #         self.add_log(f"Theme changed to {selected}")
+    #         self.add_log(f"Theme changed to {selected}", debug_message=True)
     #     except tk.TclError:
-    #         self.add_log(f"Failed to apply theme: {selected}")
+    #         self.add_log(f"Failed to apply theme: {selected}", debug_message=True)
 
     def add_log(self, message, debug_message=False):
         """
@@ -293,7 +306,7 @@ class WordleApp(tk.Tk):
             self.thread = threading.Thread(target=self.run_solver, daemon=True)
             self.thread.start()
         else:
-            self.add_log("Stop requested by user.")
+            self.add_log("Stop requested by user.", debug_message=True)
             self.running = False
 
             if self.driver:
@@ -331,11 +344,13 @@ class WordleApp(tk.Tk):
             need_download = False
 
             if not os.path.exists(target_driver_path):
-                self.add_log("ChromeDriver not found in assets; will download a compatible driver...")
+                self.add_log(
+                    "ChromeDriver not found in assets; will download a compatible driver...", debug_message=True
+                )
                 need_download = True
             else:
                 # Quick compatibility check by trying to start a headless test session
-                self.add_log("Found chromedriver in assets — checking compatibility...")
+                self.add_log("Found chromedriver in assets — checking compatibility...", debug_message=True)
                 opts = webdriver.ChromeOptions()
                 opts.add_argument("--headless=new")
                 opts.add_argument("--no-sandbox")
@@ -347,9 +362,12 @@ class WordleApp(tk.Tk):
                     temp_driver = webdriver.Chrome(service=temp_service, options=opts)
                     temp_driver.quit()
                     chromedriver_path = target_driver_path
-                    self.add_log("Existing ChromeDriver is compatible.")
+                    self.add_log("Existing ChromeDriver is compatible.", debug_message=True)
                 except Exception as ex_check:
-                    self.add_log(f"Existing ChromeDriver incompatible: {ex_check}. Will download replacement.")
+                    self.add_log(
+                        f"Existing ChromeDriver incompatible: {ex_check}. Will download replacement.",
+                        debug_message=True,
+                    )
                     need_download = True
                 finally:
 
@@ -371,20 +389,23 @@ class WordleApp(tk.Tk):
                 # chromedriver_autoinstaller.install() returns full path to downloaded exe
                 try:
                     downloaded = chromedriver_autoinstaller.install(path=temp_dir)
-                    self.add_log(f"Downloaded ChromeDriver to: {downloaded}")
+                    self.add_log(f"Downloaded ChromeDriver to: {downloaded}", debug_message=True)
                 except Exception as ex_dl:
-                    self.add_log(f"Failed to download ChromeDriver automatically: {ex_dl}")
+                    self.add_log(f"Failed to download ChromeDriver automatically: {ex_dl}", debug_message=True)
                     raise
 
                 # copy to assets/chromedriver.exe (overwrite)
                 try:
                     shutil.copyfile(downloaded, target_driver_path)
                     chromedriver_path = target_driver_path
-                    self.add_log(f"Copied ChromeDriver to: {target_driver_path}")
+                    self.add_log(f"Copied ChromeDriver to: {target_driver_path}", debug_message=True)
                 except Exception as ex_copy:
                     # fallback: use downloaded path directly if copy fails
                     chromedriver_path = downloaded
-                    self.add_log(f"Failed to copy to assets; using downloaded path: {downloaded} (error: {ex_copy})")
+                    self.add_log(
+                        f"Failed to copy to assets; using downloaded path: {downloaded} (error: {ex_copy})",
+                        debug_message=True,
+                    )
 
                 finally:
                     # remove temp dir
@@ -426,13 +447,13 @@ class WordleApp(tk.Tk):
                 self.add_log(f"Page load took too long or failed: {e}", debug_message=True)
                 try:
                     self.driver.execute_script("window.stop();")
-                    self.add_log("Forced stop sent to browser.")
+                    self.add_log("Forced stop sent to browser.", debug_message=True)
                 except Exception as e2:
                     self.add_log(f"Failed to force stop: {e2}", debug_message=True)
 
             # if user pressed Stop meanwhile, stop
             if not self.running:
-                self.add_log("Stopped by user before clicking buttons.")
+                self.add_log("Stopped by user before clicking buttons.", debug_message=True)
                 return
 
             # 1) Click "Accept all" (cookie consent) if present
@@ -446,9 +467,9 @@ class WordleApp(tk.Tk):
                     )
                 )
                 accept_btn.click()
-                self.add_log("Clicked 'Accept all' button.")
+                self.add_log("Clicked 'Accept all' button.", debug_message=True)
             except Exception as ex:
-                self.add_log(f"'Accept all' button not found or not clickable: {ex}")
+                self.add_log(f"'Accept all' button not found or not clickable: {ex}", debug_message=True)
 
             # 2) Click "Play" button (start the game) if present
             play_xpath = "//button[contains(text(),'Play')]"
@@ -463,9 +484,9 @@ class WordleApp(tk.Tk):
                 )
                 # now click via JS
                 self.driver.execute_script("arguments[0].click();", btn_play)
-                self.add_log("Clicked 'Play' button via JS.")
+                self.add_log("Clicked 'Play' button via JS.", debug_message=True)
             except Exception as ex:
-                self.add_log(f"'Play' button not found or not clickable: {ex}")
+                self.add_log(f"'Play' button not found or not clickable: {ex}", debug_message=True)
                 return
 
             # Close modal
@@ -474,9 +495,9 @@ class WordleApp(tk.Tk):
                     EC.element_to_be_clickable((By.CSS_SELECTOR, "#help-dialog > div > div > button"))
                 )
                 close_btn.click()
-                self.add_log("Clicked 'Close' button.")
+                self.add_log("Clicked 'Close' button.", debug_message=True)
             except Exception as ex:
-                self.add_log(f"'Close' button not found or not clickable: {ex}")
+                self.add_log(f"'Close' button not found or not clickable: {ex}", debug_message=True)
                 return
 
             try:
@@ -486,9 +507,9 @@ class WordleApp(tk.Tk):
                     if(ad) { ad.style.display = 'none'; }
                 """
                 )
-                self.add_log("Ad element hidden (dynamic class handled).")
+                self.add_log("Ad element hidden (dynamic class handled).", debug_message=True)
             except Exception as ex:
-                self.add_log(f"Error hiding ad: {ex}")
+                self.add_log(f"Error hiding ad: {ex}", debug_message=True)
 
             # === prepare analyzer and words ===
             try:
@@ -526,9 +547,9 @@ class WordleApp(tk.Tk):
                             body.send_keys(ch)
                             time.sleep(0.12)
                         body.send_keys(Keys.ENTER)
-                        self.add_log(f"Sent '{guess}' to page (typed into body).")
+                        self.add_log(f"Sent '{guess}' to page (typed into body).", debug_message=True)
                     except Exception as e_send:
-                        self.add_log(f"Failed to send guess '{guess}': {e_send}")
+                        self.add_log(f"Failed to send guess '{guess}': {e_send}", debug_message=True)
                         break
 
                     # wait for row element to appear
@@ -538,7 +559,7 @@ class WordleApp(tk.Tk):
                             EC.presence_of_element_located((By.CSS_SELECTOR, row_selector))
                         )
                     except Exception as e:
-                        self.add_log(f"Row {attempt} element not found: {e}")
+                        self.add_log(f"Row {attempt} element not found: {e}", debug_message=True)
                         break
 
                     # wait until all tiles in this row have a final state (not 'tbd' or empty)
@@ -552,7 +573,7 @@ class WordleApp(tk.Tk):
                                 break
                         time.sleep(0.18)
                     else:
-                        self.add_log(f"Row {attempt} not ready (timeout).")
+                        self.add_log(f"Row {attempt} not ready (timeout).", debug_message=True)
                         break
 
                     # read results
@@ -570,7 +591,7 @@ class WordleApp(tk.Tk):
                                 state = "absent"
                         results.append({"letter": letter, "state": state})
 
-                    self.add_log(f"Row {attempt} states: {results}")
+                    self.add_log(f"Row {attempt} states: {results}", debug_message=True)
 
                     # check win
                     if all(item["state"] == "correct" for item in results):
@@ -609,10 +630,10 @@ class WordleApp(tk.Tk):
                             ):
                                 excluded_letters.add(l)
 
-                    self.add_log(f"known_pattern: {known_pattern}")
-                    self.add_log(f"present_letters: {sorted(list(present_letters))}")
-                    self.add_log(f"excluded_letters: {sorted(list(excluded_letters))}")
-                    self.add_log(f"unknowns (accumulated): {unknowns}")
+                    self.add_log(f"known_pattern: {known_pattern}", debug_message=True)
+                    self.add_log(f"present_letters: {sorted(list(present_letters))}", debug_message=True)
+                    self.add_log(f"excluded_letters: {sorted(list(excluded_letters))}", debug_message=True)
+                    self.add_log(f"unknowns (accumulated): {unknowns}", debug_message=True)
 
                     # filter candidates using accumulated constraints
                     current_candidates = solver.filter_candidates(known_pattern, unknowns, list(excluded_letters))
@@ -638,9 +659,9 @@ class WordleApp(tk.Tk):
                             self.add_log(f"❌ Solver failed. The correct word was: '{solution_word}'")
                             self.translate_button.configure(state=tk.NORMAL)
                         else:
-                            self.add_log("Solver finished but no solution word was found in toast.")
+                            self.add_log("Solver finished but no solution word was found in toast.", debug_message=True)
                     except Exception as ex:
-                        self.add_log(f"Solver finished (failed to find solution word). Error: {ex}")
+                        self.add_log(f"Solver finished (failed to find solution word). Error: {ex}", debug_message=True)
 
                 # --- click on loginPromptCongrats-dialog ---
                 try:
@@ -657,17 +678,24 @@ class WordleApp(tk.Tk):
                             self.driver.execute_script("arguments[0].scrollIntoView(true);", btn1)
                             self.driver.execute_script("arguments[0].click();", btn1)
                             self.add_log(
-                                f"[Attempt {attempt+1}] Clicked 'Exit/Continue' button in loginPromptCongrats-dialog."
+                                f"[Attempt {attempt+1}] Clicked 'Exit/Continue' button in loginPromptCongrats-dialog.",
+                                debug_message=True,
                             )
                             break
                         except Exception as click_ex:
-                            self.add_log(f"[Attempt {attempt+1}] loginPromptCongrats-dialog not ready yet: {click_ex}")
+                            self.add_log(
+                                f"[Attempt {attempt+1}] loginPromptCongrats-dialog not ready yet: {click_ex}",
+                                debug_message=True,
+                            )
                             time.sleep(2)
                     else:
-                        self.add_log("Failed to click 'Exit/Continue' in loginPromptCongrats-dialog after 3 attempts.")
+                        self.add_log(
+                            "Failed to click 'Exit/Continue' in loginPromptCongrats-dialog after 3 attempts.",
+                            debug_message=True,
+                        )
 
                 except Exception as ex:
-                    self.add_log(f"LoginPromptCongrats-dialog click failed: {ex}")
+                    self.add_log(f"LoginPromptCongrats-dialog click failed: {ex}", debug_message=True)
 
                 # --- wait for next dialog (regiwallCongrats-dialog) ---
                 try:
@@ -676,7 +704,9 @@ class WordleApp(tk.Tk):
 
                     # Wait for regiwall dialog to appear
                     wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, btn2_selector)))
-                    self.add_log("regiwallCongrats-dialog detected, waiting for it to be clickable...")
+                    self.add_log(
+                        "regiwallCongrats-dialog detected, waiting for it to be clickable...", debug_message=True
+                    )
 
                     for attempt in range(3):
                         try:
@@ -684,17 +714,24 @@ class WordleApp(tk.Tk):
                             self.driver.execute_script("arguments[0].scrollIntoView(true);", btn2)
                             self.driver.execute_script("arguments[0].click();", btn2)
                             self.add_log(
-                                f"[Attempt {attempt+1}] Clicked 'Exit/Continue' button in regiwallCongrats-dialog."
+                                f"[Attempt {attempt+1}] Clicked 'Exit/Continue' button in regiwallCongrats-dialog.",
+                                debug_message=True,
                             )
                             break
                         except Exception as click_ex:
-                            self.add_log(f"[Attempt {attempt+1}] regiwallCongrats-dialog not ready yet: {click_ex}")
+                            self.add_log(
+                                f"[Attempt {attempt+1}] regiwallCongrats-dialog not ready yet: {click_ex}",
+                                debug_message=True,
+                            )
                             time.sleep(2)
                     else:
-                        self.add_log("Failed to click 'Exit/Continue' in regiwallCongrats-dialog after 3 attempts.")
+                        self.add_log(
+                            "Failed to click 'Exit/Continue' in regiwallCongrats-dialog after 3 attempts.",
+                            debug_message=True,
+                        )
 
                 except Exception as ex:
-                    self.add_log(f"RegiwallCongrats-dialog click failed: {ex}")
+                    self.add_log(f"RegiwallCongrats-dialog click failed: {ex}", debug_message=True)
 
                 finally:
                     try:
@@ -705,23 +742,9 @@ class WordleApp(tk.Tk):
                             if (dlg) dlg.remove();
                         """
                         )
-                        self.add_log("regiwallCongrats-dialog element removed from DOM.")
+                        self.add_log("regiwallCongrats-dialog element removed from DOM.", debug_message=True)
                     except Exception as cleanup_ex:
-                        self.add_log(f"Failed to remove regiwallCongrats-dialog: {cleanup_ex}")
-
-                # # --- clean old loginPrompt-dialog if exists ---
-                # try:
-                #     wait = WebDriverWait(self.driver, 5)
-                #     wait.until(EC.presence_of_element_located((By.ID, "loginPrompt-dialog")))
-                #     self.driver.execute_script(
-                #         """
-                #         let el = document.querySelector("#loginPrompt-dialog");
-                #         if (el) { el.remove(); }
-                #     """
-                #     )
-                #     self.add_log("Removed old #loginPrompt-dialog from DOM.")
-                # except Exception as ex:
-                #     self.add_log(f"#loginPrompt-dialog not found or already removed: {ex}")
+                        self.add_log(f"Failed to remove regiwallCongrats-dialog: {cleanup_ex}", debug_message=True)
 
                 try:
                     WebDriverWait(self.driver, 10).until(
@@ -732,22 +755,25 @@ class WordleApp(tk.Tk):
                         document.querySelectorAll("[id^='lire-ui-']").forEach(el => el.remove());
                     """
                     )
-                    self.add_log("Removed all elements with id starting with 'lire-ui-'.")
+                    self.add_log("Removed all elements with id starting with 'lire-ui-'.", debug_message=True)
                 except Exception as ex:
-                    self.add_log(f"No elements with id starting with 'lire-ui-' found or could not be removed: {ex}")
+                    self.add_log(
+                        f"No elements with id starting with 'lire-ui-' found or could not be removed: {ex}",
+                        debug_message=True,
+                    )
                 # --- end of replacement loop ---
 
             except Exception as ex_first:
-                self.add_log(f"Error during solving loop: {ex_first}")
+                self.add_log(f"Error during solving loop: {ex_first}", debug_message=True)
 
                 # time.sleep(3)
                 # page_html = self.driver.page_source
                 # with open("debug_page.html", "w", encoding="utf-8") as f:
                 #     f.write(page_html)
-                # self.add_log("Saved debug_page.html for inspection.")
+                # self.add_log("Saved debug_page.html for inspection.", debug_message=True)
 
         except Exception as ex:
-            self.add_log(f"Error in run_solver: {ex}")
+            self.add_log(f"Error in run_solver: {ex}", debug_message=True)
             # cleanup on error
             try:
                 if self.driver:
@@ -794,7 +820,7 @@ class WordleApp(tk.Tk):
 
         # Center the window
         top.withdraw()
-        top.iconphoto(False, self.icon)
+        top.iconphoto(False, self.donateicon)
         top.update_idletasks()
         width, height = 550, 300
         x = (top.winfo_screenwidth() // 2) - (width // 2)
