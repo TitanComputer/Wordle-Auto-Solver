@@ -20,9 +20,10 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 
 APP_VERSION = "1.7.0"
+APP_NAME = "Wordle Auto-Solver"
 
 # --- Single Instance Logic START with Timeout ---
-APP_LOCK_DIR = os.path.join(os.getenv("LOCALAPPDATA", os.getenv("HOME", "/tmp")), "Wordle Auto-Solver")
+APP_LOCK_DIR = os.path.join(os.getenv("LOCALAPPDATA", os.getenv("HOME", "/tmp")), APP_NAME)
 LOCK_FILE = os.path.join(APP_LOCK_DIR, "app.lock")
 LOCK_TIMEOUT_SECONDS = 60
 
@@ -41,8 +42,8 @@ if os.path.exists(LOCK_FILE):
                 temp_root = tk.Tk()
                 temp_root.withdraw()
                 messagebox.showwarning(
-                    f"Wordle Auto-Solver v{APP_VERSION}",
-                    "Wordle Auto-Solver is already running.\nOnly one instance is allowed.",
+                    f"{APP_NAME} v{APP_VERSION}",
+                    f"{APP_NAME} is already running.\nOnly one instance is allowed.",
                 )
                 temp_root.destroy()
             except Exception:
@@ -69,7 +70,7 @@ class WordleApp(tk.Tk):
     def __init__(self):
         super().__init__()
 
-        self.title(f"Wordle Auto-Solver v{APP_VERSION}")
+        self.title(f"{APP_NAME} v{APP_VERSION}")
         self.geometry("310x400")
         self.icon = PhotoImage(file=self.resource_path(os.path.join("assets", "icon.png")))
         self.donateicon = PhotoImage(file=self.resource_path(os.path.join("assets", "heart.png")))
@@ -336,7 +337,7 @@ class WordleApp(tk.Tk):
         try:
             # === prepare assets/chromedriver.exe path ===
             local_appdata = os.getenv("LOCALAPPDATA")
-            assets_dir = self.resource_path(os.path.join(local_appdata, "Wordle Auto-Solver"))
+            assets_dir = self.resource_path(os.path.join(local_appdata, APP_NAME))
             os.makedirs(assets_dir, exist_ok=True)
             target_driver_path = self.resource_path(os.path.join(assets_dir, "chromedriver.exe"))
 
