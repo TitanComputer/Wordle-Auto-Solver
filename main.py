@@ -211,6 +211,7 @@ class WordleApp(tk.Tk):
 
     def pronounce_word(self):
         if not self.last_solution:
+            self.add_log("No word available to pronounce.", debug_message=True)
             return
         self.pronounce_button.configure(state=tk.DISABLED)
 
