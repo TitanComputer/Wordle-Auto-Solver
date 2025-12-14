@@ -106,7 +106,7 @@ The executable was built using [`Nuitka`](https://nuitka.net/) and [`UPX`](https
 You can build the standalone executable using the following command:
 
 ```bash
-.\venv\Scripts\python.exe -m nuitka --jobs=4 --enable-plugin=upx --upx-binary="YOUR PATH\upx.exe" --enable-plugin=multiprocessing --lto=yes --enable-plugin=tk-inter --windows-console-mode=disable --follow-imports --windows-icon-from-ico="assets/icon.png" --include-data-dir=assets=assets --include-package=comtypes --include-module=pyttsx3.drivers.sapi5 --python-flag=no_site,no_asserts,no_docstrings,static_hashes --onefile --onefile-no-compression --standalone --msvc=latest --assume-yes-for-downloads --output-filename=Wordle-Auto-Solver main.py
+.\venv\Scripts\python.exe -m nuitka --jobs=4 --enable-plugin=upx --upx-binary="YOUR PATH\upx.exe" --enable-plugin=multiprocessing --lto=yes --enable-plugin=tk-inter --windows-console-mode=disable --follow-imports --windows-icon-from-ico="assets/icon.png" --include-data-dir=assets=assets --include-package=comtypes --include-module=pyttsx3.drivers.sapi5 --nofollow-import-to=doctest --nofollow-import-to=test --nofollow-import-to=unittest --python-flag=no_site,no_asserts,no_docstrings,static_hashes --onefile --onefile-no-compression --standalone --msvc=latest --assume-yes-for-downloads --output-filename=Wordle-Auto-Solver main.py
 ```
 
 ## 🚀 CI/CD
