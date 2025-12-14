@@ -67,13 +67,60 @@ jobs:
             --follow-imports \
             --windows-icon-from-ico="assets/icon.png" \
             --include-data-dir=assets=assets \
-            --python-flag=no_site,no_asserts,no_docstrings \
+            --python-flag=no_site,no_asserts,no_docstrings,static_hashes \
             --onefile \
+            --onefile-no-compression \
             --standalone \
             --msvc=latest \
             --assume-yes-for-downloads \
             --output-filename=Wordle-Auto-Solver \
+            --company-name="Titan Computer" \
+            --product-name="Wordle Auto-Solver" \
+            --file-version=${{ env.version }} \
+            --product-version=${{ env.version }} \
+            --file-description="Wordle Auto-Solver is An Auto-Solver for Wordle, built with TTK and Selenium, that plays and solves Wordle automatically in the browser." \
+            --copyright="Copyright (c) ${{ env.YEAR }} Titan Computer. All rights reserved." \
+            --trademarks="Wordle Auto-Solver is a trademark of Titan Computer." \
             main.py
+
+      # -------------------------
+      # 🔒 SELF SIGN CERT HERE
+      # -------------------------
+      - name: Self-sign the executable
+        shell: powershell
+        run: |
+          Write-Host "Creating self-signed certificate..."
+
+          # Create self-signed certificate
+          $cert = New-SelfSignedCertificate `
+            -DnsName "Titan Computer" `
+            -Type CodeSigningCert `
+            -CertStoreLocation "Cert:\CurrentUser\My" `
+            -KeyExportPolicy Exportable `
+            -NotAfter (Get-Date).AddYears(5)
+
+          # Export certificate to PFX
+          $pwd = ConvertTo-SecureString -String "P@ssw0rd123!" -Force -AsPlainText
+          Export-PfxCertificate -Cert $cert -FilePath "signcert.pfx" -Password $pwd | Out-Null
+
+          # Find signtool.exe (x64 only)
+          Write-Host "Searching for signtool.exe (x64 only)..."
+          $signtool = Get-ChildItem -Path "C:\Program Files (x86)\Windows Kits\10\bin" -Filter signtool.exe -Recurse -ErrorAction SilentlyContinue |
+                      Where-Object { $_.FullName -match '\\x64\\' } |
+                      Select-Object -First 1
+
+          if ($null -eq $signtool) {
+              Write-Error "x64 signtool.exe not found!"
+          } else {
+              Write-Host "Using signtool at: $($signtool.FullName)"
+          }
+
+          Write-Host "Using signtool at: $($signtool.FullName)"
+
+          # Sign the executable
+          & "$($signtool.FullName)" sign /f "signcert.pfx" /p "P@ssw0rd123!" `
+            /tr "http://timestamp.digicert.com" /td sha256 /fd sha256 "Wordle-Auto-Solver.exe"
+
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
