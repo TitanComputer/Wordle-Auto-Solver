@@ -21,7 +21,7 @@ from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 
-APP_VERSION = "1.8.0"
+APP_VERSION = "1.8.1"
 APP_NAME = "Wordle Auto-Solver"
 
 # --- Single Instance Logic START with Timeout ---
