@@ -25,6 +25,7 @@ This tool helps users find possible answers based on the feedback from their pre
 - 🔄 Iterates guesses until the solution is found or all six attempts are used
 - 🤖 Auto-handles popups, ads, and dialogs during the game
 - 📥 Downloadable `.exe` version (Windows only)
+- 🔊 Ability to Translate the Solution to Persian and Pronounce in English
 
 ## 🖼️ Screenshots
 
@@ -58,6 +59,8 @@ Or, run the Wordle-Auto-Solver.exe file directly if you downloaded the compiled 
    - Repeats until solved or 6 tries are used  
 4. The log shows progress, the solution 🎉, or failure after 6 attempts.  
 5. Press **Stop** anytime to end the solver.  
+6. Press **Translate to Persian** to translate the solution to Farsi.
+7. Press **Pronounce** to pronounce the solution in English.
 
 ---
 
@@ -103,7 +106,7 @@ The executable was built using [`Nuitka`](https://nuitka.net/) and [`UPX`](https
 You can build the standalone executable using the following command:
 
 ```bash
-.\venv\Scripts\python.exe -m nuitka --jobs=4 --enable-plugin=upx --upx-binary="YOUR PATH\upx.exe" --enable-plugin=multiprocessing --lto=yes --enable-plugin=tk-inter --windows-console-mode=disable --follow-imports --windows-icon-from-ico="assets/icon.png" --include-data-dir=assets=assets --include-data-files=assets/chromedriver.exe=assets/chromedriver.exe --python-flag=no_site,no_asserts,no_docstrings --onefile --standalone --msvc=latest --output-filename=Wordle-Auto-Solver main.py
+.\venv\Scripts\python.exe -m nuitka --jobs=4 --enable-plugin=upx --upx-binary="YOUR PATH\upx.exe" --enable-plugin=multiprocessing --lto=yes --enable-plugin=tk-inter --windows-console-mode=disable --follow-imports --windows-icon-from-ico="assets/icon.png" --include-data-dir=assets=assets --include-data-files=assets/chromedriver.exe=assets/chromedriver.exe --python-flag=no_site,no_asserts,no_docstrings,static_hashes --onefile --onefile-no-compression --standalone --msvc=latest --assume-yes-for-downloads --output-filename=Wordle-Auto-Solver main.py
 ```
 
 ## 🚀 CI/CD
