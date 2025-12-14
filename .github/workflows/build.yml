@@ -32,6 +32,20 @@ jobs:
           cache-dependency-path: |
             requirements.txt
 
+      - name: Read APP_VERSION from main.py
+        id: get_version
+        run: |
+          $version = Select-String -Path main.py -Pattern '^APP_VERSION\s*=\s*"(.*)"' | ForEach-Object { $_.Matches[0].Groups[1].Value }
+          echo "version=$version" >> $env:GITHUB_ENV
+
+      - name: Set YEAR env
+        run: echo "YEAR=$(Get-Date -Format yyyy)" >> $env:GITHUB_ENV
+        shell: pwsh
+
+      - name: Debug Version and YEAR
+        run: echo "Version is $env:version" && echo "YEAR is $env:YEAR"
+        shell: pwsh
+
       - name: Install Nuitka and deps
         shell: powershell
         run: |
@@ -127,16 +141,6 @@ jobs:
         with:
           name: Wordle-Auto-Solver
           path: Wordle-Auto-Solver.exe
-
-      - name: Read APP_VERSION from main.py
-        id: get_version
-        run: |
-          $version = Select-String -Path main.py -Pattern '^APP_VERSION\s*=\s*"(.*)"' | ForEach-Object { $_.Matches[0].Groups[1].Value }
-          echo "version=$version" >> $env:GITHUB_ENV
-
-      - name: Debug Version
-        run: echo "Version is $env:version"
-        shell: pwsh
 
       - name: Create Release
         id: create_release
