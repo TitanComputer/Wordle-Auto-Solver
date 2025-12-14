@@ -84,6 +84,9 @@ jobs:
             --python-flag=no_site,no_asserts,no_docstrings,static_hashes \
             --include-module=pyttsx3.drivers.sapi5 \
             --include-package=comtypes \
+            --nofollow-import-to=unittest \
+            --nofollow-import-to=doctest \
+            --nofollow-import-to=test \
             --onefile \
             --onefile-no-compression \
             --standalone \
