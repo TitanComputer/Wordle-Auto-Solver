@@ -83,8 +83,6 @@ jobs:
             --include-data-dir=assets=assets \
             --python-flag=no_site,no_asserts,no_docstrings,static_hashes \
             --include-module=pyttsx3.drivers.sapi5 \
-            --include-module=pyttsx3.drivers.nsspeak \
-            --include-module=pyttsx3.drivers.espeak \
             --onefile \
             --onefile-no-compression \
             --standalone \
