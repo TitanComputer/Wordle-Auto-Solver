@@ -6,6 +6,8 @@ import requests
 import shutil
 import sys
 import webbrowser
+import pyttsx3
+from queue import Queue
 from idlelib.tooltip import Hovertip
 from tkinter import ttk, messagebox, PhotoImage
 from PIL import Image, ImageTk
@@ -19,7 +21,7 @@ from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 
-APP_VERSION = "1.7.0"
+APP_VERSION = "1.8.0"
 APP_NAME = "Wordle Auto-Solver"
 
 # --- Single Instance Logic START with Timeout ---
@@ -97,6 +99,10 @@ class WordleApp(tk.Tk):
         self.thread = None
         self.last_solution = None
 
+        self.tts_queue = Queue()
+        self.tts_thread = threading.Thread(target=self._tts_worker, daemon=True)
+        self.tts_thread.start()
+
         # Start / Stop button
         self.start_button = ttk.Button(self, text="Start", command=self.toggle_solver)
         self.start_button.pack(pady=5, fill=tk.X, padx=10)
@@ -113,11 +119,24 @@ class WordleApp(tk.Tk):
         # Bind right-click to show menu
         self.log_box.bind("<Button-3>", self.show_log_menu)
 
-        # Translate button
+        # Translate & Pronounce button
+        action_frame = ttk.Frame(self)
+        action_frame.pack(pady=5, fill=tk.X, padx=10)
+
+        action_frame.columnconfigure(0, weight=1, uniform="x")
+        action_frame.columnconfigure(1, weight=1, uniform="x")
+
+        btn_width = 18
+
         self.translate_button = ttk.Button(
-            self, text="Translate to Persian", command=self.translate_word, state=tk.DISABLED
+            action_frame, text="Translate to Persian", command=self.translate_word, state=tk.DISABLED, width=btn_width
         )
-        self.translate_button.pack(pady=5, fill=tk.X, padx=10)
+        self.translate_button.grid(row=0, column=0, sticky="nsew", padx=(0, 5))
+
+        self.pronounce_button = ttk.Button(
+            action_frame, text="Pronunciation", command=self.pronounce_word, state=tk.DISABLED, width=btn_width
+        )
+        self.pronounce_button.grid(row=0, column=1, sticky="nsew", padx=(5, 0))
 
         # Donate button with image
         heart_path = self.resource_path(os.path.join("assets", "heart.png"))
@@ -157,6 +176,46 @@ class WordleApp(tk.Tk):
         # --- Lock Updater Control END ---
 
         self.deiconify()
+
+    def _tts_worker(self):
+        while True:
+            text = self.tts_queue.get()
+            if text is None:
+                # Exit signal
+                break
+
+            engine = None
+            try:
+                # 1. Initialize engine inside the loop for each word
+                engine = pyttsx3.init()
+                engine.setProperty("rate", 120)  # set speech rate
+
+                # 2. Say and run
+                engine.say(text)
+                engine.runAndWait()
+                self.add_log(f"Pronounced: {text}", debug_message=True)
+
+            except Exception as e:
+                self.add_log(f"TTS error: {e}", debug_message=True)
+
+            finally:
+                # 3. Stop the engine to free up resources (Crucial step)
+                if engine:
+                    try:
+                        engine.stop()
+                    except Exception as stop_e:
+                        self.add_log(f"Error stopping TTS engine: {stop_e}", debug_message=True)
+
+                self.tts_queue.task_done()
+                self.pronounce_button.configure(state=tk.NORMAL)
+
+    def pronounce_word(self):
+        if not self.last_solution:
+            return
+        self.pronounce_button.configure(state=tk.DISABLED)
+
+        self.tts_queue.put(self.last_solution)
+        self.add_log(f"Added '{self.last_solution}' to TTS queue.", debug_message=True)
 
     def _lock_updater(self):
         """
@@ -301,6 +360,7 @@ class WordleApp(tk.Tk):
             self.running = True
             self.start_button.config(text="Stop")
             self.translate_button.configure(state=tk.DISABLED)
+            self.pronounce_button.configure(state=tk.DISABLED)
             self.log_box.config(state=tk.NORMAL)
             self.log_box.delete("1.0", tk.END)
             self.log_box.config(state=tk.DISABLED)
@@ -599,6 +659,7 @@ class WordleApp(tk.Tk):
                         self.add_log(f"🎉 Solved! The word is '{guess}'.")
                         solved = True
                         self.translate_button.configure(state=tk.NORMAL)
+                        self.pronounce_button.configure(state=tk.NORMAL)
                         self.last_solution = guess
                         break
 
@@ -659,6 +720,7 @@ class WordleApp(tk.Tk):
                             self.last_solution = solution_word.lower()
                             self.add_log(f"❌ Solver failed. The correct word was: '{solution_word}'")
                             self.translate_button.configure(state=tk.NORMAL)
+                            self.pronounce_button.configure(state=tk.NORMAL)
                         else:
                             self.add_log("Solver finished but no solution word was found in toast.", debug_message=True)
                     except Exception as ex:
