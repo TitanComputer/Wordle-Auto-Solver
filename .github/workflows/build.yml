@@ -77,7 +77,6 @@ jobs:
             --enable-plugin=multiprocessing \
             --lto=yes \
             --enable-plugin=tk-inter \
-            --windows-console-mode=disable \
             --follow-imports \
             --windows-icon-from-ico="assets/icon.png" \
             --include-data-dir=assets=assets \
