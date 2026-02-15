@@ -21,7 +21,7 @@ from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 
-APP_VERSION = "1.8.3"
+APP_VERSION = "1.9.0"
 APP_NAME = "Wordle Auto-Solver"
 
 # --- Single Instance Logic START with Timeout ---
@@ -119,26 +119,30 @@ class WordleApp(tk.Tk):
         # Bind right-click to show menu
         self.log_box.bind("<Button-3>", self.show_log_menu)
 
-        # Translate & Pronounce button
+        # Action Frame for all buttons and options
         action_frame = ttk.Frame(self)
-        action_frame.pack(pady=5, fill=tk.X, padx=10)
+        action_frame.pack(pady=(5, 10), fill=tk.X, padx=10)
 
-        action_frame.columnconfigure(0, weight=1, uniform="x")
-        action_frame.columnconfigure(1, weight=1, uniform="x")
+        # Configure columns to be exactly equal
+        action_frame.columnconfigure(0, weight=1, uniform="group1")
+        action_frame.columnconfigure(1, weight=1, uniform="group1")
 
         btn_width = 18
 
+        # --- Row 0: Primary Actions ---
         self.translate_button = ttk.Button(
             action_frame, text="Translate to Persian", command=self.translate_word, state=tk.DISABLED, width=btn_width
         )
-        self.translate_button.grid(row=0, column=0, sticky="nsew", padx=(0, 5))
+        self.translate_button.grid(row=0, column=0, sticky="nsew", padx=(0, 5), pady=(0, 10))
 
         self.pronounce_button = ttk.Button(
             action_frame, text="Pronunciation", command=self.pronounce_word, state=tk.DISABLED, width=btn_width
         )
-        self.pronounce_button.grid(row=0, column=1, sticky="nsew", padx=(5, 0))
+        self.pronounce_button.grid(row=0, column=1, sticky="nsew", padx=(5, 0), pady=(0, 10))
 
-        # Donate button with image
+        # --- Row 1: Secondary Actions (Donate & Debug) ---
+
+        # Heart image logic
         heart_path = self.resource_path(os.path.join("assets", "heart.png"))
         if os.path.exists(heart_path):
             heart_img = Image.open(heart_path).resize((20, 20))
@@ -146,26 +150,34 @@ class WordleApp(tk.Tk):
         else:
             self.heart_photo = None
 
-        donate_frame = ttk.Frame(self)
-        donate_frame.pack(pady=5)
-
-        # Donate button
+        # Donate button - Centered under Translate
         self.donate_button = ttk.Button(
-            donate_frame, text="Donate", command=self.open_donate_page, image=self.heart_photo, compound="right"
+            action_frame,
+            text="Donate",
+            command=self.open_donate_page,
+            image=self.heart_photo,
+            compound="right",
+            width=btn_width,
         )
-        self.donate_button.pack(side="left", padx=10)
+        self.donate_button.grid(row=1, column=0, sticky="nsew", padx=(0, 5))
 
-        # Debug Log toggle
-        self.debug = False  # default
+        # Debug Log toggle logic
+        self.debug = False
 
         def toggle_debug():
             self.debug = bool(self.debug_var.get())
 
         self.debug_var = tk.IntVar(value=0)
+
+        # Container frame for Checkbutton to ensure perfect centering
+        debug_container = ttk.Frame(action_frame)
+        debug_container.grid(row=1, column=1, sticky="nsew")
+
         self.debug_check = ttk.Checkbutton(
-            donate_frame, text="Debug Log", variable=self.debug_var, command=toggle_debug
+            debug_container, text="Debug Log", variable=self.debug_var, command=toggle_debug
         )
-        self.debug_check.pack(side="left", padx=10)
+        # This packs the checkbutton in the middle of the container
+        self.debug_check.pack(expand=True)
 
         # --- Lock Updater Control START ---
         self.lock_refresh_active = True
