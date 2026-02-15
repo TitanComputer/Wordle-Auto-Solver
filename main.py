@@ -21,7 +21,7 @@ from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 
-APP_VERSION = "1.8.2"
+APP_VERSION = "1.8.3"
 APP_NAME = "Wordle Auto-Solver"
 
 # --- Single Instance Logic START with Timeout ---
@@ -672,33 +672,27 @@ class WordleApp(tk.Tk):
                         s = item["state"]
                         if not l:
                             continue
+
                         if s == "correct":
                             known_pattern[idx] = l
                             present_letters.add(l)
-                            if l in excluded_letters:
-                                excluded_letters.discard(l)
                         elif s == "present":
                             present_letters.add(l)
-                            if l in excluded_letters:
-                                excluded_letters.discard(l)
                             if (idx, l) not in unknowns:
                                 unknowns.append((idx, l))
                         elif s == "absent":
-                            # only add to excluded if we have no evidence that letter exists elsewhere
-                            # (not present in any discovered present/correct and not in unknowns)
-                            if (
-                                (l not in present_letters)
-                                and (l not in known_pattern)
-                                and (not any(u[1] == l for u in unknowns))
-                            ):
-                                excluded_letters.add(l)
+                            # ALWAYS add to excluded_letters.
+                            # The WordleSolver.filter_candidates will handle the logic
+                            # of whether it means "zero instances" or "no MORE instances".
+                            excluded_letters.add(l)
 
+                    # Log the current state
                     self.add_log(f"known_pattern: {known_pattern}", debug_message=True)
                     self.add_log(f"present_letters: {sorted(list(present_letters))}", debug_message=True)
                     self.add_log(f"excluded_letters: {sorted(list(excluded_letters))}", debug_message=True)
                     self.add_log(f"unknowns (accumulated): {unknowns}", debug_message=True)
 
-                    # filter candidates using accumulated constraints
+                    # filter candidates using updated logic
                     current_candidates = solver.filter_candidates(known_pattern, unknowns, list(excluded_letters))
                     self.add_log(f"Candidates left: {len(current_candidates)}")
 
