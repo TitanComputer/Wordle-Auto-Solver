@@ -109,7 +109,30 @@ class WordleSolver:
             print(f"After Unknown Positions: {len(candidates)} words")
 
         if excluded_letters:
-            candidates = [w for w in candidates if all(ch not in w for ch in excluded_letters)]
+            # Identify letters that are both excluded and present in knowns/unknowns
+            confirmed_letters = {ch for ch in known_pattern if ch} | {pair[1] for pair in unknowns}
+
+            filtered_candidates = []
+            for w in candidates:
+                keep = True
+                for ch in excluded_letters:
+                    if ch in confirmed_letters:
+                        # Special case: The letter is in the word, but this specific
+                        # instance was grey. This implies the word should not have
+                        # MORE occurrences of 'ch' than already confirmed.
+                        count_in_clues = list(known_pattern).count(ch) + [p[1] for p in unknowns].count(ch)
+                        if w.count(ch) > count_in_clues:
+                            keep = False
+                            break
+                    else:
+                        # Normal case: The letter is not in the word at all
+                        if ch in w:
+                            keep = False
+                            break
+                if keep:
+                    filtered_candidates.append(w)
+
+            candidates = filtered_candidates
             print(f"Excluded Letters: {excluded_letters}")
             print(f"After Excluded Letters: {len(candidates)} words")
 
